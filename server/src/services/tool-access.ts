@@ -91,6 +91,7 @@ import { defaultConnectionAgentInstructions } from "@paperclipai/shared";
 import { isBrowserUseConnection } from "./browser-use-client.js";
 
 import { COGNEE_STDIO_TEMPLATE } from "./cognee-connection.js";
+import { MEM0_SELF_HOSTED_TEMPLATE, MEM0_SELF_HOSTED_TEMPLATE_ID } from "./mem0-self-hosted-connection.js";
 import { isRemoteMcpConnectorMethod } from "@paperclipai/shared";
 
 import { githubBotRequest } from "./chat-github-client.js";
@@ -320,6 +321,7 @@ const APPROVED_STDIO_TEMPLATES: Record<
     ],
   },
   "paperclip.cognee-cloud": COGNEE_STDIO_TEMPLATE,
+  [MEM0_SELF_HOSTED_TEMPLATE_ID]: MEM0_SELF_HOSTED_TEMPLATE,
   "paperclip.google-sheets": {
     name: "Google Sheets",
     command: "paperclip-google-sheets-mcp-server",

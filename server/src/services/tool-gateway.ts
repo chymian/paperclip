@@ -33,6 +33,7 @@ import { boundedMcpToolName } from "./mcp-tool-names.js";
 import { browserUseService } from "./browser-use.js";
 import { isBrowserUseConnection } from "./browser-use-client.js";
 import { COGNEE_STDIO_TEMPLATE, cogneeCloudUrl, callCogneeCloud } from "./cognee-connection.js";
+import { MEM0_SELF_HOSTED_TEMPLATE, MEM0_SELF_HOSTED_TEMPLATE_ID, applyMem0SelfHostedEnvironment } from "./mem0-self-hosted-connection.js";
 import { HttpError } from "../errors.js";
 import { authorizationService, canActorReadIssuePrivacy, type AuthorizationActor } from "./authorization.js";
 import { claimSlackRateLimitRetry } from "./connectors/slack-retry.js";
@@ -560,6 +561,11 @@ const BUILTIN_LOCAL_STDIO_RUNTIME_TEMPLATES: Record<
   Omit<LocalStdioRuntimeTemplate, "templateId">
 > = {
   "paperclip.cognee-cloud": COGNEE_STDIO_TEMPLATE,
+  [MEM0_SELF_HOSTED_TEMPLATE_ID]: {
+    command: MEM0_SELF_HOSTED_TEMPLATE.command,
+    args: MEM0_SELF_HOSTED_TEMPLATE.args,
+    envKeys: MEM0_SELF_HOSTED_TEMPLATE.envKeys,
+  },
   "paperclip.google-sheets": {
     command: "paperclip-google-sheets-mcp-server",
     args: [],
@@ -5312,6 +5318,12 @@ export function createToolGatewayService(
       try { cogneeCloudUrl(env.COGNEE_BASE_URL ?? ""); }
       catch {
         throw new ToolGatewayHttpError(422, "Reconnect Cognee with the tenant API Base URL from its API Keys page.", "cognee_cloud_url_invalid");
+      }
+    }
+    if (template.templateId === MEM0_SELF_HOSTED_TEMPLATE_ID) {
+      try { return applyMem0SelfHostedEnvironment(env); }
+      catch (error) {
+        throw new ToolGatewayHttpError(422, error instanceof Error ? error.message : "Invalid Mem0 base URL.", "mem0_self_hosted_url_invalid");
       }
     }
     return env;
