@@ -55,9 +55,9 @@ jobs:
           pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile
           pnpm --dir scripts/typecheck-sandbox-providers install --resolution-only --ignore-scripts --no-frozen-lockfile
           pnpm --dir packages/plugins/sandbox-providers/daytona install --ignore-workspace --resolution-only --ignore-scripts --no-frozen-lockfile
-      - name: Refresh reviewed eval report dependency proof (as refresh-lockfile.yml)
-        if: github.event_name == 'push' || inputs.test_ref == ''
-        run: node tests/runner-e2e/prepare-report-lock.mjs --refresh
+      # The eval report-lock proof is NOT refreshed here: prepare-report-lock
+      # refuses an unreviewed committed lock (supply-chain gate). The
+      # reporting-lock-policy test therefore fails on this fork by design.
       - name: Commit refreshed lockfiles or fail on unexpected changes
         id: commit
         run: |
