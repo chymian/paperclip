@@ -348,6 +348,20 @@ COPY --chown=node:node --from=cloud-server-deps /app/.cloud-server-deps/node_mod
 # and an empty mount point for operator DSH profile patches
 # (PAPERCLIP_DSH_PROFILE_DIR). The DSH runtime itself ships in the runner's
 # dependency closure (@deepseek-ai/dsh in packages/paperclip-runner).
+# OSINTIA app tree: the build output minus artifacts the DSH-only image never
+# loads (aoe has <7 GB disk; the unslimmed /app layer was 4.3 GB): the bundled
+# Copilot provider assets, the agent CLI binaries of the non-DSH local adapters
+# (codex, claude-agent-sdk, opencode, copilot), musl-libc natives on this glibc
+# image, and build-only native tools (turbo, tsgo). Agents of those adapters
+# fail at spawn in this image; OSINTIA agents run on the DSH ACP runner.
+FROM build AS osintia-app
+RUN cd /app \
+  && rm -rf server/provider-assets/copilot \
+  && find node_modules/.pnpm -maxdepth 1 \( -name "@openai+codex*" -o -name "@anthropic-ai+claude-agent-sdk-linux-*" \
+       -o -name "opencode-linux-*" -o -name "@github+copilot-linux-*" -o -name "*musl*" \
+       -o -name "@turbo+linux-*" -o -name "@typescript+typescript-linux-*" \) -exec rm -rf {} + \
+  && test -f server/dist-runtime/index.mjs && du -sh /app
+
 FROM base AS osintia
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -371,7 +385,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # No remote provider pack (~2.3 GB compressed): it is only used for remote
 # sandbox execution (PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH); OSINTIA runs
 # the local DSH ACP runner from /app.
-COPY --chown=node:node --from=build /app /app
+COPY --chown=node:node --from=osintia-app /app /app
 RUN test -f /app/server/dist-runtime/index.mjs && test -f /app/server/dist-runtime/agent-avatar-worker.mjs \
   && test -f /app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json \
   && node -e 'const v=require("/app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json").version; if(v!=="0.2.2-rc.1"){console.error("dsh "+v);process.exit(1)}'
