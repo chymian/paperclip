@@ -28,6 +28,7 @@ import {
   PAPERCLIP_RUNNER_IDLE_TIMEOUT_MAX_MS,
   PAPERCLIP_RUNNER_PERMISSION_CAPABILITIES,
   PAPERCLIP_RUNNER_ACPX_PROFILES,
+  DEFAULT_DSH_RUNNER_MODEL,
   isPaperclipRunnerProvider,
   resolvePaperclipRunnerIdleTimeoutMs,
   resolvePaperclipRunnerPermissionMode,
@@ -351,15 +352,16 @@ export function CodexLocalConfigFields({
               const acpxSessionMode = profile?.value === "cursor" ? "agent" : undefined;
               const piThinkingLevel = profile?.value === "pi" ? "low" : undefined;
               if (!profile?.qualified) return;
-              if (isCreate) set!({ model: profile.value === "claude" ? defaultAcpxClaudeModel : "",
+              const model = profile.value === "claude" ? defaultAcpxClaudeModel : String(profile.value) === "dsh" ? DEFAULT_DSH_RUNNER_MODEL : "";
+              if (isCreate) set!({ model,
                 adapterSchemaValues: { ...values!.adapterSchemaValues, acpxAgent: profile.value, acpxSessionMode, piThinkingLevel } });
-              else { mark("adapterConfig", "acpxAgent", profile.value); mark("adapterConfig", "acpxSessionMode", acpxSessionMode); mark("adapterConfig", "piThinkingLevel", piThinkingLevel); mark("adapterConfig", "model", profile.value === "claude" ? defaultAcpxClaudeModel : ""); }
+              else { mark("adapterConfig", "acpxAgent", profile.value); mark("adapterConfig", "acpxSessionMode", acpxSessionMode); mark("adapterConfig", "piThinkingLevel", piThinkingLevel); mark("adapterConfig", "model", model); }
             }}>
             <SelectTrigger className="w-full" aria-label="ACP agent"><SelectValue /></SelectTrigger>
             <SelectContent>
               {PAPERCLIP_RUNNER_ACPX_PROFILES.map(profile => (
                 <SelectItem key={profile.value} value={profile.value} disabled={!profile.qualified}>
-                  <AdapterMark type={profile.value === "cursor" ? "cursor" : `${profile.value}_local`} className="size-4" />
+                  <AdapterMark type={profile.value === "cursor" ? "cursor" : profile.value === "dsh" ? "acpx:dsh" : `${profile.value}_local`} className="size-4" />
                   {profile.label}{profile.qualified ? "" : " — qualification pending"}
                 </SelectItem>
               ))}

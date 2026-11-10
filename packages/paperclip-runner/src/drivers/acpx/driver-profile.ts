@@ -16,7 +16,7 @@ import {
 
 import { ACPX_CAPABILITY_PROFILES } from "./capability-profiles.js";
 
-const ACPX_AGENTS = ["claude", "codex", "grok", "pi", "cursor", "copilot", "kimi", "antigravity"] as const;
+const ACPX_AGENTS = ["claude", "codex", "grok", "pi", "cursor", "copilot", "kimi", "antigravity", "dsh"] as const;
 const ACPX_PERMISSION_MODES = [
   "approve-all",
   "approve-paperclip",
@@ -45,8 +45,8 @@ export function acpxCapabilities(
     unsupported: ["qualification_pending"],
   };
   return {
-    resume: profile.recovery === "session-load",
-    toolRefreshOnResume: profile.recovery === "session-load" && profile.toolRefreshOnResume === true,
+    resume: profile.recovery !== "unverified",
+    toolRefreshOnResume: profile.recovery !== "unverified" && profile.toolRefreshOnResume === true,
     typedEvents: true,
     typedEventFamilies: providerFamilyCapabilities({
       plan: profile.plans === "semantic-only" ? "unsupported" : "available",
@@ -85,7 +85,7 @@ export function acpxDriverDescriptor(
     protocolVersion: "acp/v1",
     runtimeContextCapabilities: {
       instructions: pending ? "unsupported" : "native",
-      skills: pending ? "unsupported" : "native",
+      skills: pending || agent === "dsh" ? "unsupported" : "native",
       mcp: pending ? "unsupported" : "native",
     },
     capabilities: acpxCapabilities(agent),
@@ -115,7 +115,7 @@ export function validateAcpxDriverConfig(
     return invalid(
       "agent",
       "invalid_agent",
-      "ACPX agent must be claude, codex, grok, cursor, copilot, kimi, pi, or antigravity.",
+      "ACPX agent must be claude, codex, grok, cursor, copilot, kimi, pi, antigravity, or dsh.",
     );
   }
   if (ACPX_CAPABILITY_PROFILES[agent].qualification !== "qualified") {

@@ -132,7 +132,7 @@ impl AcpxProviderSessionConfig {
                 &self.run_id,
                 &self.normalized_session_id,
             )?;
-        } else if profile.qualification_pending {
+        } else if profile.qualification_pending && self.agent != "dsh" {
             return Err(LocalRunnerError::invalid(
                 "ACPX provider qualification is pending; this build cannot launch the provider",
             ));
@@ -2403,6 +2403,14 @@ mod mode_tests {
             .unwrap_err()
             .to_string()
             .contains("qualification is pending"));
+    }
+
+    #[test]
+    fn dsh_pending_profile_uses_host_authorized_candidate_path() {
+        let mut config = config();
+        config.agent = "dsh".to_owned();
+        config.model = "deepseek-v4-flash".to_owned();
+        config.validate().unwrap();
     }
 
     #[test]

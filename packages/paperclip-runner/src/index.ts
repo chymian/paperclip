@@ -115,7 +115,7 @@ export * as acceptedCapabilitySemanticTools from "./semantic-tools/index.js";
 export * from "./compatibility.js";
 
 export { probeAcpxClaudeInstallation, probeAcpxGrokInstallation } from "./drivers/acpx/installation-integrity.js";
-export { probeAcpxPiInstallation, probeAcpxKimiInstallation } from "./drivers/acpx/profile-installation.js";
+export { probeAcpxPiInstallation, probeAcpxKimiInstallation, probeAcpxDshInstallation } from "./drivers/acpx/profile-installation.js";
 export { PROVIDER_PACK_COMPATIBILITY, bundledRemoteProviderPackManifestPath, bundledRemoteRunnerBinary } from "./live/bundled-remote-provider-pack.js";
 
 export { RunnerdMuseDriver, describeRunnerdMuseDriver, type RunnerdMuseDriverOptions } from "./drivers/muse/runnerd-muse-driver.js";

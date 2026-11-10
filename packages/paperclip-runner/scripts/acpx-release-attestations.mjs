@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
  *
  * - `installed-command`: installation hashes the upstream package's launch
  *   command and compares it with the digest (Claude, Codex).
- * - `launcher`: the SHA-256 of a launcher shipped verbatim (Grok).
+ * - `launcher`: the SHA-256 of a launcher shipped verbatim (Grok, DSH).
  * - `closure`: upstream versions and the complete platform closure pins.
  * - `declaration`: a checked-in release declaration, hashed as canonical JSON.
  *
@@ -23,6 +23,7 @@ export const ACPX_RELEASE_ATTESTATIONS = Object.freeze({
   claude: { kind: "installed-command" },
   codex: { kind: "installed-command" },
   grok: { kind: "launcher", path: "src/providers/grok/launcher.cjs" },
+  dsh: { kind: "launcher", path: "src/providers/dsh/launcher.cjs" },
   copilot: { kind: "closure", pins: { closure: ["copilot-closure-pins.ts", "COPILOT_CLOSURE_SHA256"] } },
   pi: { kind: "closure", pins: {
     nodeVersion: ["pi-node-pins.ts", "PI_NODE_VERSION"],

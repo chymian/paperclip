@@ -6544,6 +6544,9 @@ describe("cold process admission budget", () => {
   it("bounds Pi cold startup and recovery at 60 seconds", () => {
     expect(coldAdmissionTimeoutMs("acpx", "pi", true)).toBe(60_000);
   });
+  it("bounds DSH cold startup and recovery at 60 seconds", () => {
+    expect(coldAdmissionTimeoutMs("acpx", "dsh", true)).toBe(60_000);
+  });
   it("bounds a cold ACPX Claude session.open at 60 seconds", () => {
     expect(coldAdmissionTimeoutMs("acpx", "claude", true)).toBe(60_000);
     expect(coldAdmissionTimeoutMs("acpx", "claude", false)).toBe(30_000);

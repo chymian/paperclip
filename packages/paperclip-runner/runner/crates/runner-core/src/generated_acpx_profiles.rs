@@ -27,6 +27,16 @@ pub(crate) fn kimi_native_closure(platform: &str, architecture: &str) -> Option<
 
 pub(crate) fn acpx_release_profile(agent: &str) -> Option<AcpxReleaseProfile> {
     Some(match agent {
+        "dsh" => AcpxReleaseProfile {
+            agent_server_package: "builtin:dsh-acp",
+            agent_server_version: "1",
+            agent_runtime_package: Some("@deepseek-ai/dsh"),
+            agent_runtime_version: Some("0.2.2-rc.1"),
+            command_digest:
+                "sha256:09f0bf673d8bd3893958eb1f23b9a0b6f9cde31f0d33ac120cb3b65b3b1b4b3b",
+            requires_provider_policy: true,
+            qualification_pending: true,
+        },
         "antigravity" => AcpxReleaseProfile {
             agent_server_package: "native:antigravity-acp",
             agent_server_version: "1.4.3",

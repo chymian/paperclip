@@ -502,12 +502,25 @@ const paperclipRunnerAdapter: ServerAdapterModule = {
             checks: [{ code: "copilot_metadata_verified", level: "info" as const,
               message: "The verified Copilot runtime authenticated this account and accepted the selected model. No model prompt was sent." }] };
         }
-        if (profile.acpxAgent !== "claude" && profile.acpxAgent !== "grok" && profile.acpxAgent !== "cursor" && profile.acpxAgent !== "pi" && profile.acpxAgent !== "kimi") throw new Error("Select Codex to use the native Codex runner.");
+        if (profile.acpxAgent !== "claude" && profile.acpxAgent !== "grok" && profile.acpxAgent !== "cursor" && profile.acpxAgent !== "pi" && profile.acpxAgent !== "kimi" && profile.acpxAgent !== "dsh") throw new Error("Select Codex to use the native Codex runner.");
         if (profile.acpxAgent === "kimi") {
           const environment = context.config.env as Record<string, unknown> | undefined;
           if (typeof environment?.KIMI_API_KEY !== "string" || !environment.KIMI_API_KEY.trim()) {
             return { adapterType: "paperclip_runner", status: "fail" as const, testedAt: new Date().toISOString(),
               checks: [{ code: "KIMI_AUTH_REQUIRED", level: "error" as const, message: "Bind a company secret to KIMI_API_KEY in the agent environment." }] };
+          }
+        }
+        if (profile.acpxAgent === "dsh") {
+          const configured = context.config.env;
+          const environment = configured && typeof configured === "object" && !Array.isArray(configured)
+            ? configured as Record<string, unknown> : {};
+          // The operator may point DSH at another provider credential (PAPERCLIP_DSH_PROVIDER_API_KEY_ENV).
+          const configuredKeyName = environment.PAPERCLIP_DSH_PROVIDER_API_KEY_ENV ?? process.env.PAPERCLIP_DSH_PROVIDER_API_KEY_ENV;
+          const keyName = typeof configuredKeyName === "string" && configuredKeyName.trim() ? configuredKeyName.trim() : "DEEPSEEK_API_KEY";
+          const apiKey = environment[keyName];
+          if (typeof apiKey !== "string" || !apiKey.trim()) {
+            return { adapterType: "paperclip_runner", status: "fail" as const, testedAt: new Date().toISOString(),
+              checks: [{ code: "DSH_AUTH_REQUIRED", level: "error" as const, message: `Bind ${keyName} in the agent environment.` }] };
           }
         }
         const target = context.executionTarget;
@@ -534,8 +547,8 @@ const paperclipRunnerAdapter: ServerAdapterModule = {
               message: "The remote platform is supported. Runtime package integrity and readiness must still be verified by the remote runner before launch." }],
           });
         }
-        const { probeAcpxClaudeInstallation, probeAcpxGrokInstallation, probeAcpxCursorInstallation, probeAcpxPiInstallation } = await import("../vendor/paperclip-runner/live/index.js");
-        await (profile.acpxAgent === "pi" ? probeAcpxPiInstallation : profile.acpxAgent === "grok" ? probeAcpxGrokInstallation : profile.acpxAgent === "cursor" ? probeAcpxCursorInstallation : probeAcpxClaudeInstallation)(profile.model);
+        const { probeAcpxClaudeInstallation, probeAcpxGrokInstallation, probeAcpxCursorInstallation, probeAcpxPiInstallation, probeAcpxDshInstallation } = await import("../vendor/paperclip-runner/live/index.js");
+        await (profile.acpxAgent === "dsh" ? probeAcpxDshInstallation : profile.acpxAgent === "pi" ? probeAcpxPiInstallation : profile.acpxAgent === "grok" ? probeAcpxGrokInstallation : profile.acpxAgent === "cursor" ? probeAcpxCursorInstallation : probeAcpxClaudeInstallation)(profile.model);
         return verifyNativeAcpxApiKey(context.config, {
           adapterType: "paperclip_runner", status: "pass" as const, testedAt: new Date().toISOString(),
           checks: [{ code: "acpx_runtime_ready", level: "info" as const, message: `ACPX ${profile.acpxAgent} runtime is installed and verified. Model access is checked when it runs.` }],
@@ -644,7 +657,7 @@ const paperclipRunnerAdapter: ServerAdapterModule = {
         )
       : buildNpmRuntimeCommandSpec(config, "codex", "@openai/codex@0.160.0"),
   agentConfigurationDoc:
-    "# Paperclip Runner\n\nAdapter: paperclip_runner\n\nRuns Codex, OpenCode, Claude Managed, AWS AgentCore, or ACPX Claude/Grok Build/Cursor/Pi through the Rust Paperclip runner and authenticated PRP transport. Pi accepts an explicit provider/model ID and uses the company credentials bound to the agent environment. GitHub Copilot requires a saved GitHub token and an explicitly selected available model. Managed providers use company-scoped qualified profiles, explicit retention acknowledgement, and spend limits. A board operator creates each Claude Managed (Anthropic managed agent) profile through POST /api/companies/{companyId}/managed-agent-profiles; agent credentials cannot create, qualify or list one.\n",
+    "# Paperclip Runner\n\nAdapter: paperclip_runner\n\nRuns Codex, OpenCode, Claude Managed, AWS AgentCore, or ACPX Claude/Grok Build/Cursor/Pi/DeepSeek Harness (DSH) through the Rust Paperclip runner and authenticated PRP transport. Pi accepts an explicit provider/model ID and uses the company credentials bound to the agent environment. GitHub Copilot requires a saved GitHub token and an explicitly selected available model. Managed providers use company-scoped qualified profiles, explicit retention acknowledgement, and spend limits. A board operator creates each Claude Managed (Anthropic managed agent) profile through POST /api/companies/{companyId}/managed-agent-profiles; agent credentials cannot create, qualify or list one.\n",
   getConfigSchema: () => ({
     fields: [
       {

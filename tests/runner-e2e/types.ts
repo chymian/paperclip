@@ -13,6 +13,7 @@ export const CREDENTIAL_NAMES = [
   "CURSOR_AUTH_TOKEN",
   "CURSOR_API_KEY",
   "COPILOT_GITHUB_TOKEN",
+  "DEEPSEEK_API_KEY",
 ] as const;
 
 export type CredentialName = (typeof CREDENTIAL_NAMES)[number];

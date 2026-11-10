@@ -32,6 +32,8 @@ export type {
   HarnessRuntimeRequestResolution,
   LinuxProcessStartOptions,
   NativeAcpxAgent,
+  AcpxCandidateAgent,
+  AcpxProviderPolicyAgent,
   NativeAcpxPermissionMode,
   NativeCodexApprovalPolicy,
   NativeExecutionInput,
@@ -175,6 +177,7 @@ export const resolveQualifiedAcpxProfile = runner.resolveQualifiedAcpxProfile;
 export const runnerProviderLaunchRequirements = runner.runnerProviderLaunchRequirements;
 export const createRunnerProviderLaunch = runner.createRunnerProviderLaunch;
 export const parseAcpxCandidateAdmission = runner.parseAcpxCandidateAdmission;
+export const isAcpxCandidateAgent = runner.isAcpxCandidateAgent;
 export const resolveClaudeEffort = runner.resolveClaudeEffort;
 export const resolveGrokEffort = runner.resolveGrokEffort;
 export const QUALIFIED_ACPX_PROFILES = runner.QUALIFIED_ACPX_PROFILES;

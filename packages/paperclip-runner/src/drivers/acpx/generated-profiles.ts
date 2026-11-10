@@ -4,6 +4,20 @@ export const ACPX_DRIVER_KIND = "acpx_runtime" as const;
 export const ACPX_DRIVER_PROTOCOL_VERSION = 1 as const;
 
 export const QUALIFIED_ACPX_PROFILE_DATA = {
+  "dsh": {
+    "driverKind": "acpx_runtime",
+    "protocolVersion": 1,
+    "acpxVersion": "0.13.1",
+    "agent": "dsh",
+    "agentProfileVersion": 1,
+    "agentServerPackage": "builtin:dsh-acp",
+    "agentServerVersion": "1",
+    "agentRuntimePackage": "@deepseek-ai/dsh",
+    "agentRuntimeVersion": "0.2.2-rc.1",
+    "commandDigest": "sha256:09f0bf673d8bd3893958eb1f23b9a0b6f9cde31f0d33ac120cb3b65b3b1b4b3b",
+    "qualificationStatus": "pending",
+    "permissionPolicy": "interactive"
+  },
   "antigravity": {
     "driverKind": "acpx_runtime",
     "protocolVersion": 1,

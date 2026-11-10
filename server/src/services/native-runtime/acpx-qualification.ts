@@ -47,13 +47,13 @@ export function resolveKimiCandidateAdmission(
 
 /** Operator-only admission for an exact candidate/model during qualification. */
 export const ACPX_QUALIFICATION_ENV = "PAPERCLIP_RUNNER_ACPX_QUALIFICATION";
-export type AcpxQualificationCandidate = "cursor" | "copilot" | "pi" | "kimi";
+export type AcpxQualificationCandidate = "cursor" | "copilot" | "pi" | "kimi" | "dsh";
 
 export function resolveAcpxQualification(
   provider: NativeExecutionInput["provider"] | { kind: "acpx"; agent: string; model: string },
   hostEnvironment: NodeJS.ProcessEnv,
 ): AcpxQualificationCandidate | undefined {
-  if (provider.kind !== "acpx" || !["copilot", "pi"].includes(provider.agent)) return undefined;
+  if (provider.kind !== "acpx" || !["copilot", "pi", "dsh"].includes(provider.agent)) return undefined;
   // The server release declaration admits qualified Copilot into the frozen
   // SDK's explicit native transport slot. No operator environment is required.
   // Pi retains the mainline transport and qualification behavior below.
@@ -74,7 +74,7 @@ export function resolveAcpxQualification(
   for (const entry of entries) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)
       || Object.keys(entry).sort().join(",") !== "agent,model"
-      || !["cursor", "copilot", "pi", "kimi"].includes(entry.agent)
+      || !["cursor", "copilot", "pi", "kimi", "dsh"].includes(entry.agent)
       || typeof entry.model !== "string" || !entry.model.trim() || entry.model !== entry.model.trim()
       || agents.has(entry.agent)) throw new Error("Invalid ACPX qualification authorization");
     agents.add(entry.agent);

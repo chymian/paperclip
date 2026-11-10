@@ -5,10 +5,12 @@ import { CONFIGURED_ENVIRONMENT_KEYS, configuredEnvironment, configuredEnvironme
 import { PI_CREDENTIAL_NAMES, PI_GENERAL_IAM_CREDENTIAL_NAMES, piCredentialNames } from "./pi-provider-config.js";
 import { PRECONFIGURED_HOME_KEYS, usesPreconfiguredHome } from "../preconfigured-home.js";
 import type { QualifiedAcpxAgent } from "./qualified-profiles.js";
+import { DSH_DEFAULT_API_KEY_ENV, dshCredentialNames } from "./dsh-provider-config.js";
 
 export const ACPX_CREDENTIAL_BINDING_ENV = "PAPERCLIP_ACPX_CREDENTIAL_BINDING";
 export const ACPX_CREDENTIAL_NAMES: Readonly<Record<QualifiedAcpxAgent, readonly string[]>> = {
   antigravity: ["GEMINI_API_KEY", "PAPERCLIP_ACPX_ANTIGRAVITY_AUTH_JSON_SECRET"],
+  dsh: [DSH_DEFAULT_API_KEY_ENV],
   grok: ["XAI_API_KEY"],
   kimi: ["KIMI_API_KEY"],
   pi: PI_CREDENTIAL_NAMES,
@@ -40,7 +42,14 @@ function removeKimiRuntimeOverrides(environment: NodeJS.ProcessEnv): void {
   }
 }
 
-const isCandidate = (agent: QualifiedAcpxAgent) => agent === "pi" || agent === "cursor" || agent === "copilot" || agent === "kimi" || agent === "antigravity";
+/** DSH also admits the operator-configured provider credential name. */
+function acpxCredentialNames(agent: QualifiedAcpxAgent, environment: NodeJS.ProcessEnv | undefined): readonly string[] {
+  if (agent === "pi") return piCredentialNames(environment);
+  if (agent === "dsh") return dshCredentialNames(environment);
+  return ACPX_CREDENTIAL_NAMES[agent];
+}
+
+const isCandidate = (agent: QualifiedAcpxAgent) => agent === "pi" || agent === "cursor" || agent === "copilot" || agent === "kimi" || agent === "antigravity" || agent === "dsh";
 
 /** Mint only at the controller's explicit task-environment boundary, never by copying a marker. */
 export function createAcpxCredentialBinding(
@@ -51,7 +60,7 @@ export function createAcpxCredentialBinding(
   if (!isCandidate(agent)) return undefined;
   return JSON.stringify({
     schema: "paperclip.acpx_credential_binding.v1", agent, sessionId,
-    names: (agent === "pi" ? piCredentialNames(environment) : ACPX_CREDENTIAL_NAMES[agent]).filter(name => environment !== undefined
+    names: acpxCredentialNames(agent, environment).filter(name => environment !== undefined
       && Object.hasOwn(environment, name) && Boolean(environment[name]?.trim())),
   });
 }
@@ -65,7 +74,7 @@ export function createAcpxSidecarHostEnvironment(
   if (!isCandidate(agent)) return environment;
   const invalid = () => new Error("Candidate ACPX credentials require an explicit matching session binding");
   const raw = environment[ACPX_CREDENTIAL_BINDING_ENV];
-  const credentialNames = agent === "pi" ? piCredentialNames(environment) : ACPX_CREDENTIAL_NAMES[agent];
+  const credentialNames = acpxCredentialNames(agent, environment);
   let names: string[] = [];
   if (raw !== undefined) {
     if (Buffer.byteLength(raw) > 4_096) throw invalid();
@@ -124,7 +133,7 @@ export function createSanitizedAcpxSpawnInput(
     : environment ?? process.env;
   const candidate = isCandidate(agent);
   const result: NodeJS.ProcessEnv = { ...configuredEnvironment(environment), ...providerObservabilityEnvironment(environment, agent) };
-  const credentialNames = agent === "pi" ? piCredentialNames(environment) : ACPX_CREDENTIAL_NAMES[agent];
+  const credentialNames = acpxCredentialNames(agent, environment);
   const allowed = new Set([
     "PATH",
     "LANG",

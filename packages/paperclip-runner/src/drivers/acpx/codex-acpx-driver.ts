@@ -296,8 +296,8 @@ export class CodexAcpxDriver implements HarnessDriver {
     options: CodexAcpxDriverOptions,
     dependencies: CodexAcpxDriverDependencies = {},
   ) {
-    assertAcpxProfileReleased(options.agent ?? "codex");
-    if (["pi", "cursor", "copilot", "kimi"].includes(options.agent ?? "codex") && typeof options.providerPolicy?.readOnly !== "boolean") {
+    if ((options.agent ?? "codex") !== "dsh") assertAcpxProfileReleased(options.agent ?? "codex");
+    if (["pi", "cursor", "copilot", "kimi", "dsh"].includes(options.agent ?? "codex") && typeof options.providerPolicy?.readOnly !== "boolean") {
       throw new Error("ACP candidate requires an explicit provider read-only policy");
     }
     this.#options = {
@@ -313,7 +313,7 @@ export class CodexAcpxDriver implements HarnessDriver {
     };
     this.#openHost = dependencies.openHost ?? openProductionAcpxHost;
     this.#closeSettlementTimeoutMs =
-      dependencies.closeSettlementTimeoutMs ?? CLOSE_TURN_SETTLEMENT_TIMEOUT_MS;
+      dependencies.closeSettlementTimeoutMs ?? (this.#options.agent === "dsh" ? 60_000 : CLOSE_TURN_SETTLEMENT_TIMEOUT_MS);
     this.#terminalEventReserve = Math.max(
       0,
       Math.floor(dependencies.terminalEventReserve ?? TERMINAL_EVENT_RESERVE),

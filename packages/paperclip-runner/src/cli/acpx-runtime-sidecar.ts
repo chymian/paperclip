@@ -1686,11 +1686,11 @@ function requireHost(
 }
 
 function requireQualifiedAgent(value: unknown, model?: string, candidateAdmission?: AcpxCandidateStartupAdmission): QualifiedAcpxAgent {
-  if (value !== "grok" && value !== "codex" && value !== "claude" && value !== "pi" && value !== "cursor" && value !== "copilot" && value !== "kimi" && value !== "antigravity") {
-    throw new Error("ACPX agent must be claude, codex, grok, cursor, copilot, kimi, pi, or antigravity");
+  if (value !== "grok" && value !== "codex" && value !== "claude" && value !== "pi" && value !== "cursor" && value !== "copilot" && value !== "kimi" && value !== "antigravity" && value !== "dsh") {
+    throw new Error("ACPX agent must be claude, codex, grok, cursor, copilot, kimi, pi, antigravity, or dsh");
   }
   if (candidateAdmission) assertAcpxExecutionAdmission(resolveQualifiedAcpxProfile(value, model ?? ""), candidateAdmission);
-  else assertAcpxProfileReleased(value);
+  else if (value !== "dsh") assertAcpxProfileReleased(value);
   return value;
 }
 

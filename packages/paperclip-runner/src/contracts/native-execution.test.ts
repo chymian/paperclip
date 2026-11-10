@@ -658,9 +658,13 @@ describe("native task context ownership", () => {
 
   const { permissionPolicy: _copilotPermissionPolicy, qualificationStatus: _copilotQualificationStatus,
     ...copilotSnapshot } = QUALIFIED_ACPX_PROFILES.copilot;
+  const { qualificationModel: _dshQualificationModel, reportedModelId: _dshReportedModelId,
+    permissionPolicy: _dshPermissionPolicy, qualificationStatus: _dshQualificationStatus,
+    ...dshSnapshot } = QUALIFIED_ACPX_PROFILES.dsh;
 
   it.each([
     { driverKind: "acpx_runtime", provider: { kind: "acpx", agent: "copilot", model: "gpt-5.6-luna", permissionMode: "deny-all", profile: copilotSnapshot } },
+    { driverKind: "acpx_runtime", provider: { kind: "acpx", agent: "dsh", model: "deepseek-v4-flash", permissionMode: "approve-reads", profile: dshSnapshot } },
     { driverKind: "opencode_server", provider: { kind: "opencode", model: "openrouter/deepseek/deepseek-v4-flash-0731", permissionMode: "deny" } },
     { driverKind: "acpx_runtime", provider: {
       kind: "acpx", agent: "pi", model: "openrouter/deepseek/deepseek-v4-flash-0731", permissionMode: "deny-all",

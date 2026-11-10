@@ -1315,7 +1315,8 @@ export const providerDescriptorSchema = {
         "claude",
         "codex",
         "cursor",
-        "copilot"
+        "copilot",
+        "dsh"
       ]
     },
     "requestedModel": {

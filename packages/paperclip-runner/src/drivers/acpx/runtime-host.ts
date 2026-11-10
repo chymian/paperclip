@@ -228,6 +228,8 @@ export interface AcpxRetainedCleanupFailure {
 export interface AcpxRuntimeHostDependencies {
   verifyInstallation?: (
     profile: QualifiedAcpxProfile,
+    candidateAdmission?: AcpxCandidateStartupAdmission,
+    options?: { signal?: AbortSignal },
   ) => Promise<VerifiedAcpxInstallation>;
   /** Internal test seam for aborting credential acquisition. */
   stageCredential?: typeof stageManagedCodexCredential;
@@ -406,7 +408,7 @@ export class AcpxRuntimeHost {
           grokEffort: resolveGrokEffort(options.agent, options.grokEffort),
           grokDisableWebSearch: resolveGrokDisableWebSearch(options.agent, options.grokDisableWebSearch),
           ...(preconfigured || preparedHome ? { homeBinding: preconfiguredHomeEnvironment(options.environment) } : {}),
-          ...(["cursor", "copilot", "pi", "kimi"].includes(options.agent) && options.providerPolicy !== undefined
+          ...(["cursor", "copilot", "pi", "kimi", "dsh"].includes(options.agent) && options.providerPolicy !== undefined
             ? { providerPolicy: options.providerPolicy } : {}),
         }),
       dependencies.retainAdmissionCleanup,
@@ -428,8 +430,8 @@ export class AcpxRuntimeHost {
       options.signal,
       () =>
         dependencies.verifyInstallation
-          ? dependencies.verifyInstallation(profile)
-          : verifyAcpxProfileInstallation(profile, options.candidateAdmission),
+          ? dependencies.verifyInstallation(profile, options.candidateAdmission, { signal: options.signal })
+          : verifyAcpxProfileInstallation(profile, options.candidateAdmission, { signal: options.signal }),
       dependencies.retainAdmissionCleanup,
     ).catch(error => { throw recordAcpxAdmissionFailure(error, "installation"); });
     if (installation.commandDigest !== profile.commandDigest) {

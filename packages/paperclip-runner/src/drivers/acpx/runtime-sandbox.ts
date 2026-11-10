@@ -42,6 +42,7 @@ import {
   resolveAcpxRuntimeRoot,
   type AcpxRecoveryBinding,
 } from "./recovery-identity.js";
+import { dshAcpProfilePatch, dshStateEnvironment, resolveDshConfiguration } from "./dsh-provider-config.js";
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -430,6 +431,15 @@ export async function prepareAcpxRuntimeSandbox(input: {
     const configuration = piProviderConfiguration(input.environment);
     if (configuration) await writePrivateFile(join(agentHomeDirectory, "models.json"), configuration.json);
   }
+  const dshConfiguration = input.agent === "dsh" ? resolveDshConfiguration(input.environment) : undefined;
+  const dshState = dshConfiguration ? await dshStateEnvironment(dshConfiguration) : {};
+  if (input.agent === "dsh") {
+    await writePrivateFile(join(agentHomeDirectory, "AGENTS.md"), `${policy.systemInstructions}\n`);
+    const profilesDirectory = await ensurePrivateDirectory(join(agentHomeDirectory, "profiles"), agentHomeDirectory);
+    const acpProfileDirectory = await ensurePrivateDirectory(join(profilesDirectory, "acp"), profilesDirectory);
+    await writePrivateFile(join(acpProfileDirectory, "cordis.patch.yml"),
+      await dshAcpProfilePatch(dshConfiguration!, input.binding.requestedModel));
+  }
   const initializeOwnedConfiguration = input.agent === "claude" ? async () => {
     // ACP otherwise rewrites exact IDs (including user-entered model IDs) to
     // picker aliases such as "sonnet". Its supported availableModels setting
@@ -541,6 +551,16 @@ export async function prepareAcpxRuntimeSandbox(input: {
     ...(input.agent === "kimi" ? { KIMI_CODE_HOME: agentHomeDirectory, PAPERCLIP_KIMI_INSTRUCTIONS: kimiInstructionBinding(policy.systemInstructions).payload } : {}),
     ...(input.agent === "antigravity" ? { GEMINI_HOME: agentHomeDirectory, AGY_ACP_FORCE_FILE_STORAGE: "1" } : {}),
     ...(input.agent === "grok" ? { GROK_HOME: agentHomeDirectory, NO_BROWSER: "1", GROK_DISABLE_AUTOUPDATER: "1" } : {}),
+    ...(input.agent === "dsh"
+      ? {
+          DSH_HOME: agentHomeDirectory,
+          DSH_PERMISSION_MODE: policy.readOnly ? "read-only" : "workspace-write",
+          NARB_DISABLE_NATIVE_CACHE: "1",
+          DSH_TELEMETRY_MODE: "DISABLED",
+          DSH_TELEMETRY_DISABLED: "1",
+          ...dshState,
+        }
+      : {}),
     ...(input.agent === "pi"
       ? {
           PI_CODING_AGENT_DIR: agentHomeDirectory,

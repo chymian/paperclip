@@ -52,6 +52,7 @@ export function nativeUsageBiller(provider: NativeExecutionInput["provider"]): s
     if (provider.agent === "copilot") return "github";
     if (provider.agent === "pi") return "openrouter";
     if (provider.agent === "grok") return "xai";
+    if (provider.agent === "dsh") return "dsh";
   }
   return "openai";
 }
@@ -164,7 +165,7 @@ export function nativeUsageCostUsd(
   // The ACP normalization contract fills absent per-turn cost with zero and
   // reports actual cost cumulatively. Until it carries an authoritative run
   // delta with provenance, neither value is a candidate's billed USD receipt.
-  if (provider?.kind === "acpx" && ["cursor", "copilot", "pi"].includes(provider.agent)) return undefined;
+  if (provider?.kind === "acpx" && ["cursor", "copilot", "pi", "dsh"].includes(provider.agent)) return undefined;
   if (!usage) return undefined;
   const measurement = nativeUsageMeasurement(usage);
   const hasRunDelta = Object.hasOwn(usage, "runDelta") || Object.hasOwn(record(usage.usage), "runDelta");

@@ -6,7 +6,7 @@ import { BUILTIN_ADAPTER_TYPES } from "./builtin-adapter-types.js";
 import { QUALIFIED_ACPX_PROFILES, KIMI_DISTRIBUTION_CLOSURE_SHA256 } from "../vendor/paperclip-runner/index.js";
 import { assertHarnessTestPassed } from "../services/agent-harness-verification.js";
 
-const { probeInstallation, probeGrokInstallation, probePiInstallation, probeKimiInstallation, probeKimiModels, probeKimiRemote, verifyApiKey } = vi.hoisted(() => ({
+const { probeInstallation, probeGrokInstallation, probePiInstallation, probeKimiInstallation, probeKimiModels, probeKimiRemote, probeDshInstallation, verifyApiKey } = vi.hoisted(() => ({
   verifyApiKey: vi.fn(),
   probeInstallation: vi.fn(),
   probeGrokInstallation: vi.fn(),
@@ -14,6 +14,7 @@ const { probeInstallation, probeGrokInstallation, probePiInstallation, probeKimi
   probeKimiInstallation: vi.fn(),
   probeKimiModels: vi.fn(),
   probeKimiRemote: vi.fn(),
+  probeDshInstallation: vi.fn(),
 }));
 vi.mock("../services/ai-api-key-test.js", () => ({ validateAiApiKey: verifyApiKey }));
 vi.mock("../services/kimi-connection-probe.js", () => ({ probeKimiExecutionTarget: probeKimiRemote }));
@@ -23,6 +24,7 @@ vi.mock("../vendor/paperclip-runner/live/index.js", () => ({
   probeAcpxPiInstallation: probePiInstallation,
   probeAcpxKimiInstallation: probeKimiInstallation,
   probeKimiModels,
+  probeAcpxDshInstallation: probeDshInstallation,
   probeAcpxCursorInstallation: vi.fn(async () => undefined),
 }));
 
@@ -158,6 +160,7 @@ describe("native ACPX environment checks", () => {
     probeKimiInstallation.mockReset().mockResolvedValue(undefined);
     probeKimiModels.mockReset().mockResolvedValue(undefined);
     probeKimiRemote.mockReset().mockResolvedValue(undefined);
+    probeDshInstallation.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
@@ -320,6 +323,28 @@ describe("native ACPX environment checks", () => {
     expect(probePiInstallation).toHaveBeenCalledWith(model);
     expect(probeInstallation).not.toHaveBeenCalled();
     expect(probeGrokInstallation).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("checks DSH installation readiness with exact host authorization (%s)", async (ready) => {
+    vi.stubEnv(ACPX_QUALIFICATION_ENV, JSON.stringify([{ agent: "dsh", model: "deepseek-v4-flash" }]));
+    if (!ready) probeDshInstallation.mockRejectedValueOnce(new Error("DSH installation integrity mismatch"));
+    const result = await requireServerAdapter("paperclip_runner").testEnvironment!({
+      ...context,
+      config: { provider: "acpx", acpxAgent: "dsh", model: "deepseek-v4-flash", env: { DEEPSEEK_API_KEY: "fixture-key" } },
+    });
+    expect(result.status).toBe(ready ? "pass" : "fail");
+    expect(probeDshInstallation).toHaveBeenCalledWith("deepseek-v4-flash");
+    expect(probeInstallation).not.toHaveBeenCalled();
+  });
+
+  it("requires a bound DeepSeek credential before probing DSH", async () => {
+    vi.stubEnv(ACPX_QUALIFICATION_ENV, JSON.stringify([{ agent: "dsh", model: "deepseek-v4-flash" }]));
+    const result = await requireServerAdapter("paperclip_runner").testEnvironment!({
+      ...context,
+      config: { provider: "acpx", acpxAgent: "dsh", model: "deepseek-v4-flash" },
+    });
+    expect(result).toMatchObject({ status: "fail", checks: [{ code: "DSH_AUTH_REQUIRED" }] });
+    expect(probeDshInstallation).not.toHaveBeenCalled();
   });
 
   it("does not use the host platform to reject a remote environment", async () => {

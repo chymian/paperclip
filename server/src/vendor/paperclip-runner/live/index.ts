@@ -19,3 +19,4 @@ export const probeKimiMetadata = runner.probeKimiMetadata;
 export const validateKimiMetadata = runner.validateKimiMetadata;
 export const kimiMetadataProbeDigest = runner.kimiMetadataProbeDigest;
 export const kimiMetadataProbeNodeDigest = runner.kimiMetadataProbeNodeDigest;
+export const probeAcpxDshInstallation = runner.probeAcpxDshInstallation;

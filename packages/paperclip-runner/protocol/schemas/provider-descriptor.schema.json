@@ -109,7 +109,8 @@
         "claude",
         "codex",
         "cursor",
-        "copilot"
+        "copilot",
+        "dsh"
       ]
     },
     "requestedModel": {

@@ -1071,7 +1071,7 @@ export function resolveNativeProviderEnvironment(
   host: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   if (configured !== undefined) return configured;
-  if (provider.kind === "acpx" && ["pi", "cursor", "copilot", "kimi", "antigravity"].includes(provider.agent)) {
+  if (provider.kind === "acpx" && ["pi", "cursor", "copilot", "kimi", "antigravity", "dsh"].includes(provider.agent)) {
     return buildNativeProviderEnvironment({}, host);
   }
   if (provider.kind === "cursor_cloud") return {};
@@ -9422,6 +9422,15 @@ export async function executePaperclipNativeSession(input: {
     },
   ) => Promise<unknown>;
 }): Promise<AdapterExecutionResult> {
+  if (
+    input.execution.provider.kind === "acpx" &&
+    ["copilot", "dsh"].includes(input.execution.provider.agent) &&
+    !resolveAcpxQualification(input.execution.provider, process.env)
+  ) {
+    throw new Error(
+      "paperclip_runner_provider_unsupported: ACPX candidate requires exact host qualification authorization; authorize the provider and model in PAPERCLIP_RUNNER_ACPX_QUALIFICATION before retrying; no provider was launched",
+    );
+  }
   const agentKeyId = input.runnerEnvironment?.PAPERCLIP_AGENT_KEY_ID;
   if (agentKeyId) {
     // Recovered pre-upgrade inputs also need the current public identity marker
@@ -12641,6 +12650,9 @@ export function resolveNativeBilling(provider: NativeExecutionInput["provider"],
     : identity;
   if (provider.kind === "claude_managed") return { provider: "anthropic", biller: "anthropic", billingType: "metered_api" };
   if (provider.kind === "aws_agentcore") return { provider: "aws_agentcore", biller: "aws_agentcore", billingType: "metered_api" };
+  if (provider.kind === "acpx" && provider.agent === "dsh") {
+    return { provider: "deepseek", biller: "deepseek", billingType: env.DEEPSEEK_API_KEY?.trim() ? "metered_api" : "unknown" };
+  }
   if (provider.kind === "acpx" && ["cursor", "copilot"].includes(provider.agent)) {
     const biller = nativeUsageBiller(provider);
     return { provider: biller, biller, billingType: "unknown" };
