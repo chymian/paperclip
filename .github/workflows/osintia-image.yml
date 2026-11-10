@@ -152,16 +152,40 @@ jobs:
         run: cargo test --release --manifest-path runner/Cargo.toml --locked --workspace
 
   server-node:
+    # Upstream lanes (pr-trusted.yml): general-server-without-chat x12 and
+    # serialized x9 via scripts/run-vitest-stable.mjs. Chat/workspaces lanes not run.
+    name: server-node (${{ matrix.mode }} ${{ matrix.idx }}/${{ matrix.count }})
     needs: lockfile
     if: github.event_name == 'push' || inputs.run_tests
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        include:
+          - { mode: general, group: "general-server-without-chat", idx: 0, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 1, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 2, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 3, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 4, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 5, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 6, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 7, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 8, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 9, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 10, count: 12 }
+          - { mode: general, group: "general-server-without-chat", idx: 11, count: 12 }
+          - { mode: serialized, group: "", idx: 0, count: 9 }
+          - { mode: serialized, group: "", idx: 1, count: 9 }
+          - { mode: serialized, group: "", idx: 2, count: 9 }
+          - { mode: serialized, group: "", idx: 3, count: 9 }
+          - { mode: serialized, group: "", idx: 4, count: 9 }
+          - { mode: serialized, group: "", idx: 5, count: 9 }
+          - { mode: serialized, group: "", idx: 6, count: 9 }
+          - { mode: serialized, group: "", idx: 7, count: 9 }
+          - { mode: serialized, group: "", idx: 8, count: 9 }
     steps:
       - uses: actions/checkout@v7
         with:
@@ -171,21 +195,39 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: cd packages/paperclip-runner && rustup show
       - run: pnpm install --frozen-lockfile
-      - name: Build runner + plugin SDK prerequisites
-        run: |
-          pnpm --filter @paperclipai/paperclip-runner run build:typescript
-          pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
-      - name: Server suite shard ${{ matrix.shard }}/4
-        working-directory: server
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4 --reporter=default --reporter=junit --outputFile.junit=../vitest-server-${{ matrix.shard }}.xml
-      - if: always()
-        uses: actions/upload-artifact@v7
+      - name: Build runner TypeScript
+        run: pnpm --filter @paperclipai/paperclip-runner run build:typescript
+      - name: General server shard
+        if: matrix.mode == 'general'
+        run: pnpm test:run:general -- --group '${{ matrix.group }}' --shard-index ${{ matrix.idx }} --shard-count ${{ matrix.count }}
+      - name: Serialized server shard
+        if: matrix.mode == 'serialized'
+        run: pnpm test:run:serialized -- --shard-index ${{ matrix.idx }} --shard-count ${{ matrix.count }}
+
+  upstream-baseline:
+    # Same runner node:test on unmodified upstream master, to classify
+    # stage-runner-binary failures as pre-existing or ours.
+    if: github.event_name == 'push' || inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
         with:
-          name: vitest-server-${{ matrix.shard }}
-          path: vitest-server-${{ matrix.shard }}.xml
-          if-no-files-found: ignore
+          ref: master
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: build:rust (master)
+        run: pnpm --filter @paperclipai/paperclip-runner run build:rust
+      - name: stage-runner-binary test on master
+        working-directory: packages/paperclip-runner
+        run: node --test scripts/stage-runner-binary.test.mjs
 
   image:
     needs: lockfile
