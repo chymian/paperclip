@@ -55,6 +55,9 @@ jobs:
           pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile
           pnpm --dir scripts/typecheck-sandbox-providers install --resolution-only --ignore-scripts --no-frozen-lockfile
           pnpm --dir packages/plugins/sandbox-providers/daytona install --ignore-workspace --resolution-only --ignore-scripts --no-frozen-lockfile
+      - name: Refresh reviewed eval report dependency proof (as refresh-lockfile.yml)
+        if: github.event_name == 'push' || inputs.test_ref == ''
+        run: node tests/runner-e2e/prepare-report-lock.mjs --refresh
       - name: Commit refreshed lockfiles or fail on unexpected changes
         id: commit
         run: |
@@ -64,13 +67,13 @@ jobs:
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          unexpected="$(printf '%s\n' "$changed" | awk -v allowed="$LOCKFILES" 'BEGIN{n=split(allowed,f," ");for(i=1;i<=n;i++)ok[f[i]]=1} !($2 in ok){print}')"
+          unexpected="$(printf '%s\n' "$changed" | awk -v allowed="$LOCKFILES tests/runner-e2e/report-lock.json tests/runner-e2e/report-lock.patch" 'BEGIN{n=split(allowed,f," ");for(i=1;i<=n;i++)ok[f[i]]=1} !($2 in ok){print}')"
           if [ -n "$unexpected" ]; then
             echo "::error::Unexpected files changed during lockfile refresh:"; echo "$changed"; exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- $LOCKFILES
+          git add -- $LOCKFILES tests/runner-e2e/report-lock.json tests/runner-e2e/report-lock.patch
           git commit -m "chore(lock): refresh pnpm lockfiles for osintia/integration"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -230,11 +233,25 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: build:typescript + plugin-sdk (master)
+        run: |
+          pnpm --filter @paperclipai/paperclip-runner run build:typescript
+          pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
       - name: build:rust (master)
         run: pnpm --filter @paperclipai/paperclip-runner run build:rust
       - name: stage-runner-binary test on master
+        continue-on-error: true
         working-directory: packages/paperclip-runner
         run: node --test scripts/stage-runner-binary.test.mjs
+      - name: Server suites that fail on osintia/integration, on master
+        working-directory: server
+        run: >-
+          pnpm exec vitest run
+          src/services/native-runtime/runner-bridge-tools.test.ts
+          src/services/remote-workspace-cohort-migration.test.ts
+          src/__tests__/heartbeat-preparation-gap-spans.test.ts
+          src/__tests__/approval-queue-seeding-work.test.ts
+          src/__tests__/dot-runner.test.ts
 
   image:
     needs: lockfile
