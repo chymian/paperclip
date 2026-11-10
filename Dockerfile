@@ -406,7 +406,7 @@ ENV NODE_ENV=production \
   PAPERCLIP_DEPLOYMENT_MODE=authenticated \
   PAPERCLIP_DEPLOYMENT_EXPOSURE=private \
   PAPERCLIP_DSH_PROFILE_DIR=/opt/osintia/dsh/base-profile \
-  OSINTIA_DSH_BUNDLE_PROFILE=/opt/dsh-profiles/osintia
+  PAPERCLIP_DSH_BUNDLE_DIR=/opt/dsh-profiles/osintia
 EXPOSE 3100
 ENTRYPOINT ["/usr/bin/tini", "-s", "--", "docker-entrypoint.sh"]
 CMD ["node", "server/dist-runtime/index.mjs"]

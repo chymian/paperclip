@@ -21,7 +21,9 @@ import {
   readFile,
   realpath,
   rename,
+  rm,
   stat,
+  symlink,
   unlink,
   type FileHandle,
 } from "node:fs/promises";
@@ -42,7 +44,7 @@ import {
   resolveAcpxRuntimeRoot,
   type AcpxRecoveryBinding,
 } from "./recovery-identity.js";
-import { dshAcpProfilePatch, dshStateEnvironment, resolveDshConfiguration } from "./dsh-provider-config.js";
+import { dshAcpProfileManifest, dshAcpProfilePatch, dshStateEnvironment, resolveDshConfiguration, seedDshMem0Registry } from "./dsh-provider-config.js";
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -439,6 +441,14 @@ export async function prepareAcpxRuntimeSandbox(input: {
     const acpProfileDirectory = await ensurePrivateDirectory(join(profilesDirectory, "acp"), profilesDirectory);
     await writePrivateFile(join(acpProfileDirectory, "cordis.patch.yml"),
       await dshAcpProfilePatch(dshConfiguration!, input.binding.requestedModel));
+    const manifest = await dshAcpProfileManifest(dshConfiguration!);
+    if (manifest !== undefined) {
+      await writePrivateFile(join(acpProfileDirectory, "package.json"), manifest);
+      const modules = join(acpProfileDirectory, "node_modules");
+      await rm(modules, { recursive: true, force: true });
+      await symlink(join(dshConfiguration!.bundleDir!, "node_modules"), modules, "dir");
+    }
+    await seedDshMem0Registry(dshConfiguration!, input.environment);
   }
   const initializeOwnedConfiguration = input.agent === "claude" ? async () => {
     // ACP otherwise rewrites exact IDs (including user-entered model IDs) to

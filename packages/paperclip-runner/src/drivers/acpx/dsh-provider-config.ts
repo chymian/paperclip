@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
 /**
@@ -19,7 +19,16 @@ export const DSH_ENV = Object.freeze({
   providerContextWindow: "PAPERCLIP_DSH_PROVIDER_CONTEXT_WINDOW",
   providerMaxTokens: "PAPERCLIP_DSH_PROVIDER_MAX_TOKENS",
   stateDir: "PAPERCLIP_DSH_STATE_DIR",
+  bundleDir: "PAPERCLIP_DSH_BUNDLE_DIR",
+  mem0Endpoint: "PAPERCLIP_DSH_MEM0_ENDPOINT",
+  mem0ApiKeyEnv: "PAPERCLIP_DSH_MEM0_API_KEY_ENV",
+  mem0UserId: "PAPERCLIP_DSH_MEM0_USER_ID",
+  mem0AgentId: "PAPERCLIP_DSH_MEM0_AGENT_ID",
 } as const);
+
+/** Shipped ACP profile layers (dsh-official-bundles PROFILE_TEMPLATES.acp); operator bundles follow them. */
+export const DSH_ACP_BASE_BUNDLES = Object.freeze(["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-acp-app"]);
+const NPM_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 
 export const DSH_DEFAULT_PROVIDER_ID = "deepseek-official";
 export const DSH_DEFAULT_API_KEY_ENV = "DEEPSEEK_API_KEY";
@@ -42,6 +51,10 @@ export interface DshRuntimeConfiguration {
   readonly profilePath?: string;
   /** Absolute persistent directory for mnemon memory (MNEMON_DATA_DIR). */
   readonly stateDir?: string;
+  /** Absolute plugin-bundle directory: package.json (`dsh.profile.bundles`) plus its node_modules. */
+  readonly bundleDir?: string;
+  /** Self-hosted Mem0 connection seeded into the mnemon state (requires stateDir). */
+  readonly mem0?: { readonly endpoint: string; readonly apiKeyEnv: string; readonly userId: string; readonly agentId: string };
 }
 
 type Environment = Readonly<Record<string, string | undefined>> | undefined;
@@ -136,7 +149,27 @@ export function resolveDshConfiguration(task?: Environment, host: Environment = 
   }
   const stateDir = setting(DSH_ENV.stateDir, task, host);
   if (stateDir !== undefined && (!isAbsolute(stateDir) || resolve(stateDir) !== stateDir)) throw new Error(`${DSH_ENV.stateDir} must be an absolute normalized path`);
-  return Object.freeze({ providerId, apiKeyEnv, ...(provider ? { provider } : {}), ...(profilePath ? { profilePath } : {}), ...(stateDir ? { stateDir } : {}) });
+  const bundleDir = setting(DSH_ENV.bundleDir, task, host);
+  if (bundleDir !== undefined && (!isAbsolute(bundleDir) || resolve(bundleDir) !== bundleDir)) throw new Error(`${DSH_ENV.bundleDir} must be an absolute normalized path`);
+  const mem0Endpoint = setting(DSH_ENV.mem0Endpoint, task, host);
+  let mem0: DshRuntimeConfiguration["mem0"];
+  if (mem0Endpoint !== undefined) {
+    let url: URL;
+    try { url = new URL(mem0Endpoint); } catch { throw new Error(`${DSH_ENV.mem0Endpoint} must be an absolute http(s) URL`); }
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.search || url.hash) {
+      throw new Error(`${DSH_ENV.mem0Endpoint} must be an absolute http(s) URL without credentials, query or fragment`);
+    }
+    if (stateDir === undefined) throw new Error(`${DSH_ENV.mem0Endpoint} requires ${DSH_ENV.stateDir}`);
+    const keyEnv = setting(DSH_ENV.mem0ApiKeyEnv, task, host);
+    if (keyEnv === undefined) throw new Error(`${DSH_ENV.mem0Endpoint} requires ${DSH_ENV.mem0ApiKeyEnv}`);
+    const userId = setting(DSH_ENV.mem0UserId, task, host);
+    if (userId === undefined || !/^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/.test(userId)) throw new Error(`${DSH_ENV.mem0UserId} must be set to 1-128 safe characters`);
+    const agentId = setting(DSH_ENV.mem0AgentId, task, host) ?? "*";
+    if (agentId !== "*" && !/^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/.test(agentId)) throw new Error(`${DSH_ENV.mem0AgentId} must be '*' or 1-128 safe characters`);
+    mem0 = Object.freeze({ endpoint: mem0Endpoint, apiKeyEnv: assertDshApiKeyEnv(keyEnv), userId, agentId });
+  }
+  return Object.freeze({ providerId, apiKeyEnv, ...(provider ? { provider } : {}), ...(profilePath ? { profilePath } : {}), ...(stateDir ? { stateDir } : {}),
+    ...(bundleDir ? { bundleDir } : {}), ...(mem0 ? { mem0 } : {}) });
 }
 
 /** Credential names a DSH launch may receive. */
@@ -187,4 +220,55 @@ export async function dshStateEnvironment(configuration: DshRuntimeConfiguration
   if (!configuration.stateDir) return {};
   await mkdir(configuration.stateDir, { recursive: true, mode: 0o700 });
   return { MNEMON_DATA_DIR: configuration.stateDir };
+}
+
+/**
+ * The ACP profile manifest (`$DSH_HOME/profiles/acp/package.json`) when an operator
+ * bundle directory is configured: the shipped ACP layers, then the bundles listed in
+ * `<bundleDir>/package.json` under `dsh.profile.bundles`, in order and without duplicates.
+ * DSH resolves these from its installation first, then from the profile's node_modules,
+ * which the runner links to `<bundleDir>/node_modules`.
+ */
+export async function dshAcpProfileManifest(configuration: DshRuntimeConfiguration): Promise<string | undefined> {
+  if (!configuration.bundleDir) return undefined;
+  const bytes = await readFile(join(configuration.bundleDir, "package.json"));
+  if (bytes.byteLength > MAX_PROFILE_BYTES) throw new Error(`${DSH_ENV.bundleDir}/package.json exceeds ${MAX_PROFILE_BYTES} bytes`);
+  const listed = (JSON.parse(bytes.toString("utf8")) as { dsh?: { profile?: { bundles?: unknown } } }).dsh?.profile?.bundles;
+  if (!Array.isArray(listed) || listed.some(name => typeof name !== "string" || !NPM_NAME.test(name))) {
+    throw new Error(`${DSH_ENV.bundleDir}/package.json must list package names in dsh.profile.bundles`);
+  }
+  const bundles = [...new Set([...DSH_ACP_BASE_BUNDLES, ...(listed as string[])])];
+  return `${JSON.stringify({ name: "dsh-profile-acp", private: true, dependencies: {}, dsh: { profile: { bundles } } }, undefined, 2)}\n`;
+}
+
+/** mnemon Memory Spaces provider registry (dsh-mnemon-source-memory-spaces, format version 4). */
+export const DSH_MEM0_REGISTRY_RELATIVE = join("state", "memory-providers.json");
+
+/**
+ * Seed the self-hosted Mem0 connection into the agent's persistent mnemon state, once:
+ * an existing registry (operator- or DSH-managed) is never overwritten. The credential is
+ * read from the runner environment by name and stays in the 0700 state directory; it is
+ * not passed to the DSH process environment.
+ */
+export async function seedDshMem0Registry(configuration: DshRuntimeConfiguration, task?: Environment, host: Environment = process.env, now = new Date()): Promise<"seeded" | "kept" | "none"> {
+  if (!configuration.mem0 || !configuration.stateDir) return "none";
+  const apiKey = setting(configuration.mem0.apiKeyEnv, task, host);
+  if (apiKey === undefined) throw new Error(`${configuration.mem0.apiKeyEnv} is not set for the DSH Mem0 connection`);
+  const directory = join(configuration.stateDir, "state");
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const at = now.toISOString();
+  const registry = {
+    version: 4,
+    services: { mem0: { mode: "self-hosted", endpoint: configuration.mem0.endpoint, apiKey } },
+    enabled: { mem0: true },
+    bodies: [{ id: "mem0-default", name: "Mem0", active: true, providerId: "mem0",
+      connection: { userId: configuration.mem0.userId, agentId: configuration.mem0.agentId }, createdAt: at, updatedAt: at }],
+  };
+  try {
+    await writeFile(join(configuration.stateDir, DSH_MEM0_REGISTRY_RELATIVE), `${JSON.stringify(registry, undefined, 2)}\n`, { flag: "wx", mode: 0o600 });
+    return "seeded";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return "kept";
+    throw error;
+  }
 }
