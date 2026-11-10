@@ -1501,6 +1501,22 @@
       "keyPermissions": "Add/update/delete memories under the API key account. Create a key with read and write permissions for these actions; Paperclip cannot increase an existing key\u2019s permissions."
     },
     {
+      "app": "mem0",
+      "method": "self-hosted",
+      "auth": "api_key",
+      "policy": "provider-key",
+      "requestedScopes": [],
+      "capability": "provider-controlled",
+      "supportedActions": "Add and read memories (add, search, recall, list, get, list entities) on the self-hosted Mem0 server.",
+      "evidence": [
+        "https://docs.mem0.ai/open-source/overview",
+        "https://www.npmjs.com/package/@yeyuan98/mem0-mcp"
+      ],
+      "reviewedAt": "2026-11-10",
+      "liveProof": "not-run",
+      "keyPermissions": "Key of the self-hosted Mem0 server; Paperclip exposes only add/read tools of mem0-mcp 0.3.4."
+    },
+    {
       "app": "miro",
       "method": "mcp-oauth",
       "auth": "oauth",

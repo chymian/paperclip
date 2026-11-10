@@ -52,6 +52,52 @@
       "warnings": [
         "A Mem0 API key; the live server currently requires the slash-normalized endpoint."
       ]
+    },
+    {
+      "key": "self-hosted",
+      "transport": "local_stdio",
+      "auth": "api_key",
+      "ownershipModes": [
+        "customer"
+      ],
+      "whenToUse": "Use when you run Mem0 OSS (self-hosted REST server) yourself; Paperclip launches the mem0-mcp stdio server against it.",
+      "defaults": {
+        "templateKey": "paperclip.mem0-self-hosted"
+      },
+      "guidanceMd": "Enter the base URL of your self-hosted Mem0 REST API (or leave it empty when the instance sets PAPERCLIP_MEM0_BASE_URL) and the API key of that server.",
+      "riskTier": "S3",
+      "label": "Self-hosted Mem0",
+      "credentialFields": [
+        {
+          "key": "MEM0_BASE_URL",
+          "label": "Mem0 base URL",
+          "type": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "http://mem0:8000",
+          "helperMd": "Base URL of the self-hosted Mem0 REST API. Empty uses the instance default PAPERCLIP_MEM0_BASE_URL.",
+          "validation": {
+            "pattern": "^https?://\\S+$",
+            "maxLength": 2048
+          }
+        },
+        {
+          "key": "MEM0_API_KEY",
+          "label": "Mem0 API key",
+          "type": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Paste the X-API-Key of your Mem0 server",
+          "helperMd": "Key of the self-hosted Mem0 server (sent as X-API-Key by mem0-mcp)."
+        }
+      ],
+      "keyPlacement": {
+        "location": "env",
+        "name": "MEM0_API_KEY"
+      },
+      "consoleLinks": {
+        "docs": "https://docs.mem0.ai/open-source/overview"
+      }
     }
   ],
   "agentInstructions": {
