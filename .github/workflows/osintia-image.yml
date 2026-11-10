@@ -1,0 +1,225 @@
+name: OSINTIA fork CI + image
+
+# Fork-only workflow (chymian/paperclip, branch osintia/integration).
+# 1. refresh pnpm lockfiles (same commands as refresh-lockfile.yml) and commit them,
+# 2. typecheck, runner Node/Rust suites, server Node suite (sharded),
+# 3. build the slim OSINTIA image (Dockerfile target `osintia`) and push it to
+#    ghcr.io/<owner>/paperclip:<commit sha> (immutable tag).
+on:
+  workflow_dispatch:
+    inputs:
+      test_ref:
+        description: "Optional ref/sha to test instead of the lock commit (e.g. upstream master to classify pre-existing failures)"
+        required: false
+        default: ""
+      build_image:
+        description: "Build and push the image"
+        type: boolean
+        default: true
+      run_tests:
+        description: "Run typecheck and test suites"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: osintia-image-${{ github.ref }}-${{ inputs.test_ref }}
+  cancel-in-progress: false
+
+env:
+  LOCKFILES: pnpm-lock.yaml scripts/typecheck-sandbox-providers/pnpm-lock.yaml packages/plugins/sandbox-providers/daytona/pnpm-lock.yaml
+
+jobs:
+  lockfile:
+    if: github.repository != 'paperclipai/paperclip'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Refresh pnpm lockfiles (resolution only)
+        if: inputs.test_ref == ''
+        run: |
+          pnpm install --resolution-only --ignore-scripts --no-frozen-lockfile
+          pnpm --dir scripts/typecheck-sandbox-providers install --resolution-only --ignore-scripts --no-frozen-lockfile
+          pnpm --dir packages/plugins/sandbox-providers/daytona install --ignore-workspace --resolution-only --ignore-scripts --no-frozen-lockfile
+      - name: Commit refreshed lockfiles or fail on unexpected changes
+        id: commit
+        run: |
+          changed="$(git status --porcelain)"
+          if [ -z "$changed" ]; then
+            echo "Lockfiles up to date."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          unexpected="$(printf '%s\n' "$changed" | awk -v allowed="$LOCKFILES" 'BEGIN{n=split(allowed,f," ");for(i=1;i<=n;i++)ok[f[i]]=1} !($2 in ok){print}')"
+          if [ -n "$unexpected" ]; then
+            echo "::error::Unexpected files changed during lockfile refresh:"; echo "$changed"; exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- $LOCKFILES
+          git commit -m "chore(lock): refresh pnpm lockfiles for osintia/integration"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  typecheck:
+    needs: lockfile
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test_ref || needs.lockfile.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Rust toolchain (runner rust-toolchain.toml)
+        run: cd packages/paperclip-runner && rustup show
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (all workspaces incl. runner rust check)
+        env:
+          NODE_OPTIONS: --max-old-space-size=12288
+        run: pnpm typecheck
+
+  runner-node:
+    needs: lockfile
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test_ref || needs.lockfile.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: cd packages/paperclip-runner && rustup show
+      - run: pnpm install --frozen-lockfile
+      - name: Runner TypeScript suite
+        run: pnpm --filter @paperclipai/paperclip-runner run test:typescript
+
+  runner-rust:
+    needs: lockfile
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test_ref || needs.lockfile.outputs.sha }}
+      - run: cd packages/paperclip-runner && rustup show
+      - name: cargo fmt + check
+        working-directory: packages/paperclip-runner
+        run: |
+          cargo fmt --manifest-path runner/Cargo.toml --all -- --check
+          cargo check --manifest-path runner/Cargo.toml --locked --workspace
+      - name: cargo test
+        working-directory: packages/paperclip-runner
+        run: cargo test --release --manifest-path runner/Cargo.toml --locked --workspace
+
+  server-node:
+    needs: lockfile
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.test_ref || needs.lockfile.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: cd packages/paperclip-runner && rustup show
+      - run: pnpm install --frozen-lockfile
+      - name: Build runner + plugin SDK prerequisites
+        run: |
+          pnpm --filter @paperclipai/paperclip-runner run build:typescript
+          pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+      - name: Server suite shard ${{ matrix.shard }}/4
+        working-directory: server
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4 --reporter=default --reporter=junit --outputFile.junit=../vitest-server-${{ matrix.shard }}.xml
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-server-${{ matrix.shard }}
+          path: vitest-server-${{ matrix.shard }}.xml
+          if-no-files-found: ignore
+
+  image:
+    needs: lockfile
+    if: inputs.build_image && inputs.test_ref == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af >/dev/null || true
+          df -h /
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.lockfile.outputs.sha }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: name
+        run: echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/paperclip" >> "$GITHUB_OUTPUT"
+      - name: Build and push (target osintia, amd64)
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          target: osintia
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.name.outputs.image }}:${{ needs.lockfile.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.lockfile.outputs.sha }}
+          build-args: |
+            PAPERCLIP_BUILD_COMMIT=${{ needs.lockfile.outputs.sha }}
+          cache-from: type=gha,scope=osintia-amd64
+          cache-to: type=gha,mode=max,scope=osintia-amd64
+      - name: Summary
+        run: |
+          echo "image: ${{ steps.name.outputs.image }}:${{ needs.lockfile.outputs.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "digest: ${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"

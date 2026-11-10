@@ -1,0 +1,17 @@
+{
+  "name": "osintia-dsh-profile",
+  "private": true,
+  "dependencies": {
+    "@deepseek-ai/dsh-base": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-web-app": "0.2.2-rc.1",
+    "dsh-mnemon": "0.5.43",
+    "dsh-mnemon-provider-mem0": "0.5.5",
+    "dsh-darwin-forge": "0.1.1",
+    "dsh-continual-evolve": "0.19.4",
+    "dsh-web-search-searxng": "0.5.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "dsh": {"profile": {"bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-mnemon", "dsh-darwin-forge", "dsh-continual-evolve", "dsh-web-search-searxng"]}},
+  "pnpm": {"overrides": {"react": "18.3.1", "react-dom": "18.3.1"}}
+}

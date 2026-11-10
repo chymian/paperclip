@@ -341,3 +341,59 @@ COPY --chown=node:node --from=cloud-plugins /app/packages/plugins/sandbox-provid
 # both a CommonJS `require.resolve` and an ECMAScript `import` — an entry
 # on `NODE_PATH` would satisfy only the first and silently fail the second.
 COPY --chown=node:node --from=cloud-server-deps /app/.cloud-server-deps/node_modules /app/server/node_modules
+
+# OSINTIA fork image (build with `--target osintia`): the production image
+# without the globally installed agent CLIs (claude/codex/opencode/gemini/kimi),
+# plus a DeepSeek Harness plugin-bundle profile at /opt/dsh-profiles/osintia
+# and an empty mount point for operator DSH profile patches
+# (PAPERCLIP_DSH_PROFILE_DIR). The DSH runtime itself ships in the runner's
+# dependency closure (@deepseek-ai/dsh in packages/paperclip-runner).
+FROM base AS osintia
+ARG USER_UID=1000
+ARG USER_GID=1000
+WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends jq \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /paperclip /opt/osintia/dsh/base-profile \
+  && chown node:node /paperclip
+COPY docker/osintia/dsh-profile/package.json docker/osintia/dsh-profile/pnpm-workspace.yaml /opt/dsh-profiles/osintia/
+RUN cd /opt/dsh-profiles/osintia \
+  && printf "# OSINTIA DSH plugin-bundle profile root\n[]\n" > cordis.yml \
+  && npx --yes pnpm@9.15.4 install --no-frozen-lockfile --config.confirmModulesPurge=false --reporter=append-only \
+  && for p in dsh-mnemon dsh-mnemon-provider-mem0 dsh-darwin-forge dsh-continual-evolve dsh-web-search-searxng; do \
+       test -f "node_modules/$p/package.json" || { echo "ERROR: DSH bundle $p missing" >&2; exit 1; }; \
+     done \
+  && rm -rf /root/.cache /root/.npm /root/.local/share/pnpm \
+  && chmod -R a+rX /opt/dsh-profiles
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY --chown=node:node --from=build /app /app
+COPY --chown=0:0 --from=runner-provider-pack /provider-pack /opt/paperclip-runner/provider-pack
+COPY --from=runner-provider-pack /provider-pack-transport/ /opt/paperclip-runner/
+RUN chmod -R a+rX /opt/paperclip-runner/provider-pack \
+  && test -f /app/server/dist-runtime/index.mjs \
+  && test -f /app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json \
+  && node -e 'const v=require("/app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json").version; if(v!=="0.2.2-rc.1"){console.error("dsh "+v);process.exit(1)}'
+ENV PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH=/opt/paperclip-runner/provider-pack
+ARG PAPERCLIP_BUILD_VERSION=""
+ARG PAPERCLIP_BUILD_COMMIT=""
+ENV NODE_ENV=production \
+  HOME=/paperclip \
+  HOST=0.0.0.0 \
+  PORT=3100 \
+  SERVE_UI=true \
+  PAPERCLIP_HOME=/paperclip \
+  PAPERCLIP_INSTANCE_ID=default \
+  PAPERCLIP_BUILD_VERSION=${PAPERCLIP_BUILD_VERSION} \
+  PAPERCLIP_BUILD_COMMIT=${PAPERCLIP_BUILD_COMMIT} \
+  USER_UID=${USER_UID} \
+  USER_GID=${USER_GID} \
+  PAPERCLIP_CONFIG=/paperclip/instances/default/config.json \
+  PAPERCLIP_DEPLOYMENT_MODE=authenticated \
+  PAPERCLIP_DEPLOYMENT_EXPOSURE=private \
+  PAPERCLIP_DSH_PROFILE_DIR=/opt/osintia/dsh/base-profile \
+  OSINTIA_DSH_BUNDLE_PROFILE=/opt/dsh-profiles/osintia
+EXPOSE 3100
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "docker-entrypoint.sh"]
+CMD ["node", "server/dist-runtime/index.mjs"]
