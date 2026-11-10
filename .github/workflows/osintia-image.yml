@@ -152,7 +152,7 @@ jobs:
         run: cargo test --release --manifest-path runner/Cargo.toml --locked --workspace
 
   server-node:
-    # Upstream lanes (pr-trusted.yml): general-server-without-chat x12 and
+    # Upstream lanes (pr-trusted.yml): general-server-without-chat-or-native-runner x12, native-runner x1 and
     # serialized x9 via scripts/run-vitest-stable.mjs. Chat/workspaces lanes not run.
     name: server-node (${{ matrix.mode }} ${{ matrix.idx }}/${{ matrix.count }})
     needs: lockfile
@@ -165,18 +165,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { mode: general, group: "general-server-without-chat", idx: 0, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 1, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 2, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 3, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 4, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 5, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 6, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 7, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 8, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 9, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 10, count: 12 }
-          - { mode: general, group: "general-server-without-chat", idx: 11, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 0, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 1, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 2, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 3, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 4, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 5, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 6, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 7, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 8, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 9, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 10, count: 12 }
+          - { mode: general, group: "general-server-without-chat-or-native-runner", idx: 11, count: 12 }
+          - { mode: native, group: "general-server-native-runner", idx: 0, count: 1 }
           - { mode: serialized, group: "", idx: 0, count: 9 }
           - { mode: serialized, group: "", idx: 1, count: 9 }
           - { mode: serialized, group: "", idx: 2, count: 9 }
@@ -198,6 +199,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build runner TypeScript
         run: pnpm --filter @paperclipai/paperclip-runner run build:typescript
+      - name: Runner release binaries (native-runner lane)
+        if: matrix.mode == 'native'
+        run: pnpm --filter @paperclipai/paperclip-runner run build:rust
+      - name: Native-runner server suites
+        if: matrix.mode == 'native'
+        run: pnpm test:run:general -- --group '${{ matrix.group }}'
       - name: General server shard
         if: matrix.mode == 'general'
         run: pnpm test:run:general -- --group '${{ matrix.group }}' --shard-index ${{ matrix.idx }} --shard-count ${{ matrix.count }}
