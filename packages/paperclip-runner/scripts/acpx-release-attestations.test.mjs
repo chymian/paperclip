@@ -14,7 +14,7 @@ const COMPUTED = Object.keys(manifest.profiles).filter(agent => ACPX_RELEASE_ATT
 const packageFiles = [
   "acpx-profiles.json", "package.json", "cursor-distributions.json", "cursor-contract.json", "antigravity-distributions.json",
   "scripts/acpx-release-attestations.mjs", "scripts/generate-acpx-profiles.mjs",
-  "src/providers/grok/launcher.cjs", "src/drivers/acpx/copilot-closure-pins.ts",
+  "src/providers/grok/launcher.cjs", "src/providers/dsh/launcher.cjs", "src/drivers/acpx/copilot-closure-pins.ts",
   "src/drivers/acpx/pi-closure-pins.ts", "src/drivers/acpx/pi-node-pins.ts",
   "src/drivers/acpx/kimi-closure-pins.ts",
   "src/drivers/acpx/generated-profiles.ts", "runner/crates/runner-core/src/generated_acpx_profiles.rs",
@@ -38,7 +38,7 @@ const generate = (root, ...args) => spawnSync(process.execPath, [join(root, "scr
 
 test("every profile declares how its digest attests the upstream release", async () => {
   assert.deepEqual(Object.keys(ACPX_RELEASE_ATTESTATIONS).sort(), Object.keys(manifest.profiles).sort());
-  assert.deepEqual(COMPUTED.sort(), ["antigravity", "copilot", "cursor", "grok", "kimi", "pi"]);
+  assert.deepEqual(COMPUTED.sort(), ["antigravity", "copilot", "cursor", "dsh", "grok", "kimi", "pi"]);
   for (const agent of COMPUTED) {
     assert.equal(manifest.profiles[agent].commandDigest, (await acpxReleaseAttestation(agent, packageRoot)).commandDigest, agent);
   }
