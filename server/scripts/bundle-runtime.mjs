@@ -73,10 +73,14 @@ function externalizeThirdParty(isBundled, runtimeDir) {
 
 /** @param {{ entry: string, outdir: string, maintenanceEntry?: string, ephemeralMigrationEntry?: string,
  * nativeHarnessPrestageEntry?: string, onlineWorkspaceMigrationEntry?: string, isBundled?: (specifier: string) => boolean }} options */
-export async function bundleRuntime({ entry, outdir, maintenanceEntry, ephemeralMigrationEntry, nativeHarnessPrestageEntry, onlineWorkspaceMigrationEntry, isBundled = (specifier) => specifier.startsWith("@paperclipai/") }) {
+export async function bundleRuntime({ entry, outdir, avatarWorkerEntry, maintenanceEntry, ephemeralMigrationEntry, nativeHarnessPrestageEntry, onlineWorkspaceMigrationEntry, isBundled = (specifier) => specifier.startsWith("@paperclipai/") }) {
   await rm(outdir, { recursive: true, force: true });
   const result = await build({
-    entryPoints: { index: "paperclip-runtime-entry", server: entry, ...(maintenanceEntry ? { "agent-files": maintenanceEntry } : {}),
+    entryPoints: { index: "paperclip-runtime-entry", server: entry,
+      // Worker threads cannot load the workspace TypeScript the main bundle inlines;
+      // a bundled worker keeps tsx/esbuild (and its unreaped child) out of production.
+      ...(avatarWorkerEntry ? { "agent-avatar-worker": avatarWorkerEntry } : {}),
+      ...(maintenanceEntry ? { "agent-files": maintenanceEntry } : {}),
       ...(ephemeralMigrationEntry ? { "ephemeral-migration": ephemeralMigrationEntry } : {}),
       ...(nativeHarnessPrestageEntry ? { "native-harness-prestage": nativeHarnessPrestageEntry } : {}),
       ...(onlineWorkspaceMigrationEntry ? { "online-workspace-migration": onlineWorkspaceMigrationEntry } : {}) },
@@ -108,6 +112,7 @@ export async function bundleRuntime({ entry, outdir, maintenanceEntry, ephemeral
 async function main() {
   const started = performance.now();
   const summary = await bundleRuntime({ entry: join(serverDir, "dist", "index.js"), outdir: join(serverDir, "dist-runtime"),
+    avatarWorkerEntry: join(serverDir, "dist", "services", "agent-avatar-worker.js"),
     maintenanceEntry: join(serverDir, "dist", "maintenance", "agent-files.js"),
     ephemeralMigrationEntry: join(serverDir, "dist", "maintenance", "ephemeral-migration.js"),
     nativeHarnessPrestageEntry: join(serverDir, "dist", "maintenance", "native-harness-prestage.js"),

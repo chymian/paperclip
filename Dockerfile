@@ -372,7 +372,7 @@ COPY --chown=node:node --from=build /app /app
 COPY --chown=0:0 --from=runner-provider-pack /provider-pack /opt/paperclip-runner/provider-pack
 COPY --from=runner-provider-pack /provider-pack-transport/ /opt/paperclip-runner/
 RUN chmod -R a+rX /opt/paperclip-runner/provider-pack \
-  && test -f /app/server/dist-runtime/index.mjs \
+  && test -f /app/server/dist-runtime/index.mjs && test -f /app/server/dist-runtime/agent-avatar-worker.mjs \
   && test -f /app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json \
   && node -e 'const v=require("/app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json").version; if(v!=="0.2.2-rc.1"){console.error("dsh "+v);process.exit(1)}'
 ENV PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH=/opt/paperclip-runner/provider-pack
