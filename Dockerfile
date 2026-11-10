@@ -380,6 +380,11 @@ RUN cd /opt/dsh-profiles/osintia \
      done \
   && rm -rf /root/.cache /root/.npm /root/.local/share/pnpm \
   && chmod -R a+rX /opt/dsh-profiles
+# Self-hosted Mem0 connector (method `self-hosted`, PAPERCLIP_MEM0_MCP_COMMAND default `mem0-mcp`):
+# the reviewed stdio MCP server, pinned (tool contract reviewed from 0.3.4).
+RUN npm install -g --no-fund --no-audit @yeyuan98/mem0-mcp@0.3.4 \
+  && command -v mem0-mcp \
+  && rm -rf /root/.npm
 COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # No remote provider pack (~2.3 GB compressed): it is only used for remote
