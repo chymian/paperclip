@@ -1751,7 +1751,10 @@ export function toolAccessService(
       getAvailableConnectionMethods(galleryEntry).filter(
         (candidate) =>
           candidate.purpose !== "channel" && candidate.purpose !== "ai"
-          && candidate.transport !== "chat_sdk" && candidate.transport !== "runtime_auth",
+          && candidate.transport !== "chat_sdk" && candidate.transport !== "runtime_auth"
+          // Self-hosted Mem0 is opt-in by method key; omitting the key keeps
+          // the original Mem0 Cloud method as before.
+          && candidate.defaults?.templateKey !== MEM0_SELF_HOSTED_TEMPLATE_ID,
       ).length > 1 &&
       !inferredMethodKey
     ) {
