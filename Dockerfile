@@ -368,14 +368,13 @@ RUN cd /opt/dsh-profiles/osintia \
   && chmod -R a+rX /opt/dsh-profiles
 COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# No remote provider pack (~2.3 GB compressed): it is only used for remote
+# sandbox execution (PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH); OSINTIA runs
+# the local DSH ACP runner from /app.
 COPY --chown=node:node --from=build /app /app
-COPY --chown=0:0 --from=runner-provider-pack /provider-pack /opt/paperclip-runner/provider-pack
-COPY --from=runner-provider-pack /provider-pack-transport/ /opt/paperclip-runner/
-RUN chmod -R a+rX /opt/paperclip-runner/provider-pack \
-  && test -f /app/server/dist-runtime/index.mjs && test -f /app/server/dist-runtime/agent-avatar-worker.mjs \
+RUN test -f /app/server/dist-runtime/index.mjs && test -f /app/server/dist-runtime/agent-avatar-worker.mjs \
   && test -f /app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json \
   && node -e 'const v=require("/app/packages/paperclip-runner/node_modules/@deepseek-ai/dsh/package.json").version; if(v!=="0.2.2-rc.1"){console.error("dsh "+v);process.exit(1)}'
-ENV PAPERCLIP_RUNNER_REMOTE_PROVIDER_PACK_PATH=/opt/paperclip-runner/provider-pack
 ARG PAPERCLIP_BUILD_VERSION=""
 ARG PAPERCLIP_BUILD_COMMIT=""
 ENV NODE_ENV=production \
