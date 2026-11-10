@@ -224,6 +224,8 @@ try {
     "codex-acp",
     "@agentclientprotocol/codex-acp/dist/index.js",
   );
+  // pnpm writes DSH's bin shim with the temporary deploy path.
+  writePortableNodeShim("dsh", "@deepseek-ai/dsh/lib/bin.js");
 
   // pnpm deploy may retain a workspace self-link under its virtual store. It
   // points outside the immutable pack and is not needed by the deployed

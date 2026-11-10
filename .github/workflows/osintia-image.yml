@@ -117,8 +117,18 @@ jobs:
           cache: pnpm
       - run: cd packages/paperclip-runner && rustup show
       - run: pnpm install --frozen-lockfile
-      - name: Runner TypeScript suite
-        run: pnpm --filter @paperclipai/paperclip-runner run test:typescript
+      - name: Runner TypeScript prep (build + node:test contracts)
+        id: prep
+        continue-on-error: true
+        run: pnpm --filter @paperclipai/paperclip-runner run test:typescript:prep
+      - name: Runner vitest suite
+        working-directory: packages/paperclip-runner
+        run: pnpm exec vitest run
+      - name: Fail when prep failed
+        if: steps.prep.outcome == 'failure'
+        run: |
+          echo "::error::test:typescript:prep failed (see step above)"
+          exit 1
 
   runner-rust:
     needs: lockfile

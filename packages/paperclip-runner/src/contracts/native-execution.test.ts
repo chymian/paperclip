@@ -658,8 +658,7 @@ describe("native task context ownership", () => {
 
   const { permissionPolicy: _copilotPermissionPolicy, qualificationStatus: _copilotQualificationStatus,
     ...copilotSnapshot } = QUALIFIED_ACPX_PROFILES.copilot;
-  const { qualificationModel: _dshQualificationModel, reportedModelId: _dshReportedModelId,
-    permissionPolicy: _dshPermissionPolicy, qualificationStatus: _dshQualificationStatus,
+  const { permissionPolicy: _dshPermissionPolicy, qualificationStatus: _dshQualificationStatus,
     ...dshSnapshot } = QUALIFIED_ACPX_PROFILES.dsh;
 
   it.each([

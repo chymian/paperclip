@@ -5,6 +5,7 @@ import * as executionTarget from "@paperclipai/adapter-utils/execution-target";
 import { BUILTIN_ADAPTER_TYPES } from "./builtin-adapter-types.js";
 import { QUALIFIED_ACPX_PROFILES, KIMI_DISTRIBUTION_CLOSURE_SHA256 } from "../vendor/paperclip-runner/index.js";
 import { assertHarnessTestPassed } from "../services/agent-harness-verification.js";
+import { ACPX_QUALIFICATION_ENV } from "../services/native-runtime/acpx-qualification.js";
 
 const { probeInstallation, probeGrokInstallation, probePiInstallation, probeKimiInstallation, probeKimiModels, probeKimiRemote, probeDshInstallation, verifyApiKey } = vi.hoisted(() => ({
   verifyApiKey: vi.fn(),
