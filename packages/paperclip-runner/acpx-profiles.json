@@ -10,7 +10,7 @@
       "agentServerVersion": "1",
       "agentRuntimePackage": "@deepseek-ai/dsh",
       "agentRuntimeVersion": "0.2.2-rc.1",
-      "commandDigest": "sha256:09f0bf673d8bd3893958eb1f23b9a0b6f9cde31f0d33ac120cb3b65b3b1b4b3b",
+      "commandDigest": "sha256:7dacb135ac7f34b13a90d2b083cea5ffcfe105156816936e011e1606dbfb45ae",
       "requiresProviderPolicy": true,
       "qualificationStatus": "pending"
     },

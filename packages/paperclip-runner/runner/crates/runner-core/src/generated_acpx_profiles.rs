@@ -33,7 +33,7 @@ pub(crate) fn acpx_release_profile(agent: &str) -> Option<AcpxReleaseProfile> {
             agent_runtime_package: Some("@deepseek-ai/dsh"),
             agent_runtime_version: Some("0.2.2-rc.1"),
             command_digest:
-                "sha256:09f0bf673d8bd3893958eb1f23b9a0b6f9cde31f0d33ac120cb3b65b3b1b4b3b",
+                "sha256:7dacb135ac7f34b13a90d2b083cea5ffcfe105156816936e011e1606dbfb45ae",
             requires_provider_policy: true,
             qualification_pending: true,
         },
