@@ -81,9 +81,11 @@ const SESSION_HANDSHAKE_TIMEOUT_MS = 30_000;
  * Pi and Claude get the same 60 s cold session.open bound as the runner's
  * sidecar and the controller's cold admission budget. A cold Claude handshake
  * exceeded 30 s on a loaded host; a shorter inner bound would fail first.
+ * DSH shares it: runnerd (session_open_timeout) and the controller already admit
+ * DSH for 60 s, and a cold DSH ACP boot with operator plugin bundles exceeded 30 s.
  */
 export function acpxSessionHandshakeTimeoutMs(agent: string): number {
-  return agent === "pi" || agent === "claude" ? 60_000 : SESSION_HANDSHAKE_TIMEOUT_MS;
+  return agent === "pi" || agent === "claude" || agent === "dsh" ? 60_000 : SESSION_HANDSHAKE_TIMEOUT_MS;
 }
 
 interface GoalAwareAcpRuntime extends AcpRuntime {

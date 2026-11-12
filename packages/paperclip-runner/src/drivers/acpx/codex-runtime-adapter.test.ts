@@ -2543,6 +2543,7 @@ describe("Codex ACPX runtime adapter", () => {
     expect(acpxSessionHandshakeTimeoutMs(agent)).toBe(admitted ? 60_000 : 30_000);
     // Pi shares Claude's budget; its admission needs Pi-only options, so only the bound is checked here.
     expect(acpxSessionHandshakeTimeoutMs("pi")).toBe(60_000);
+    expect(acpxSessionHandshakeTimeoutMs("dsh")).toBe(60_000);
     vi.useFakeTimers();
     try {
       const child = fakeChild();
