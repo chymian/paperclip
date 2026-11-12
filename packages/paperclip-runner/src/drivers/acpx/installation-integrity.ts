@@ -1977,6 +1977,17 @@ export function sanitizedNodeEnvironment(
   return sanitized;
 }
 
+/**
+ * Closed-launch bootstrap. Bare and relative module lookups must start from
+ * canonical (realpath) package roots: Node's node_modules walk from
+ * `/proc/self/fd/N` cannot see pnpm's sibling layout, which is what kept
+ * DSH from loading `semver` and answering session/new. After a resolution
+ * is verified against retained ancestry, the canonical URL is exposed as
+ * the module identity so DSH's own `createRequire(...).resolve.paths`
+ * (profile bundle lookup) still works; the load hook re-pins and reads
+ * through the directory fd. Modules under DSH_HOME / the operator profile
+ * and bundle dirs are admitted as runtime plugins (not sealed npm ancestry).
+ */
 function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependencyLimit = MAX_DEPENDENCY_ANCESTORS, entryRoot = false): string {
   return [
     'const fs = require("node:fs");',
@@ -2044,7 +2055,7 @@ function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependenc
     "const dependencyAncestorIndex = (url) => { const recorded = dependencyAncestorByUrl.get(url); return recorded === undefined ? snapshotDescriptorAncestorIndex(url, directoryUrl, dependencyDirectoryUrls) : recorded; };",
     `const guardSnapshotModuleResolution = ${guardSnapshotModuleResolution.toString()};`,
     'const canonicalizeDescriptorResolution = (url) => { if (typeof url !== "string" || !url.startsWith("file:") || snapshotDescriptorAncestorIndex(url, directoryUrl, dependencyDirectoryUrls) < 0) return url; try { return pathToFileURL(fs.realpathSync(fileURLToPath(url))).href; } catch { const error = new Error("ACPX provider module could not be canonicalized through its retained descriptor"); error.code = "ERR_ACPX_UNVERIFIED_MODULE"; throw error; } };',
-    'const rememberDependencyAncestor = (specifier, resolution) => { const canonicalUrl = canonicalizeDescriptorResolution(resolution?.url); const pinned = snapshotDescriptorResolution(canonicalUrl, directoryUrl, dependencyDirectoryUrls, canonicalDirectoryUrl, canonicalDependencyDirectoryUrls); guardSnapshotModuleResolution(isBuiltin(specifier), resolution?.url, pinned !== null); if (pinned !== null && typeof resolution?.url === "string") { for (const rememberedUrl of [resolution.url, canonicalUrl, pinned.url]) { if (typeof rememberedUrl !== "string") continue; dependencyAncestorByUrl.set(rememberedUrl, pinned.ancestorIndex); if (typeof resolution.format === "string") descriptorFormatByUrl.set(rememberedUrl, resolution.format); } } return pinned === null || pinned.url === resolution?.url ? resolution : { ...resolution, url: pinned.url }; };',
+    'const isAllowedRuntimeModule = (url) => { if (typeof url !== "string" || !url.startsWith("file:")) return false; let resolvedPath; try { resolvedPath = fs.realpathSync(fileURLToPath(url)); } catch { return false; } for (const key of ["DSH_HOME", "PAPERCLIP_DSH_PROFILE_DIR", "PAPERCLIP_DSH_BUNDLE_DIR"]) { const root = process.env[key]; if (!root) continue; try { const realRoot = fs.realpathSync(root); if (resolvedPath === realRoot || resolvedPath.startsWith(realRoot + "/")) return true; } catch {} } return false; };const rememberDependencyAncestor = (specifier, resolution) => { const canonicalUrl = canonicalizeDescriptorResolution(resolution?.url); const pinned = snapshotDescriptorResolution(canonicalUrl, directoryUrl, dependencyDirectoryUrls, canonicalDirectoryUrl, canonicalDependencyDirectoryUrls); const runtimeAllowed = pinned === null && (isAllowedRuntimeModule(canonicalUrl) || isAllowedRuntimeModule(resolution?.url)); guardSnapshotModuleResolution(isBuiltin(specifier), resolution?.url, pinned !== null || runtimeAllowed); if (pinned !== null && typeof resolution?.url === "string") { for (const rememberedUrl of [resolution.url, canonicalUrl, pinned.url]) { if (typeof rememberedUrl !== "string") continue; dependencyAncestorByUrl.set(rememberedUrl, pinned.ancestorIndex); if (typeof resolution.format === "string") descriptorFormatByUrl.set(rememberedUrl, resolution.format); } } return pinned === null ? resolution : { ...resolution, url: typeof canonicalUrl === "string" ? canonicalUrl : resolution.url }; };',
     `const source = fs.readFileSync(${COMMAND_SOURCE_FD});`,
     "let resolvingDescriptorBare = false;",
     "const resolveBareFromDescriptor = (specifier, dependencyDirectoryUrl) => { resolvingDescriptorBare = true; try { return require.resolve(specifier, { paths: [fileURLToPath(dependencyDirectoryUrl)] }); } finally { resolvingDescriptorBare = false; } };",
@@ -2055,10 +2066,12 @@ function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependenc
     "const parentDependencyAncestorIndex = entryImport ? 0 : dependencyAncestorIndex(context.parentURL);",
     'const relativeImport = (entryImport || parentDependencyAncestorIndex >= 0) && (specifier.startsWith("./") || specifier.startsWith("../"));',
     "const pinRelativeSpecifier = () => {",
-    "const parentDescriptorIndex = context.parentURL.startsWith(directoryUrl) ? -1 : dependencyDirectoryUrls.findIndex((dependencyDirectoryUrl) => context.parentURL.startsWith(dependencyDirectoryUrl));",
+    "let parentUrl = context.parentURL;",
+    "let parentDescriptorIndex = parentUrl.startsWith(directoryUrl) ? -1 : dependencyDirectoryUrls.findIndex((dependencyDirectoryUrl) => parentUrl.startsWith(dependencyDirectoryUrl));",
+    "if (parentDescriptorIndex === -1 && !parentUrl.startsWith(directoryUrl)) { try { const pinnedParent = snapshotDescriptorResolution(pathToFileURL(fs.realpathSync(fileURLToPath(parentUrl))).href, directoryUrl, dependencyDirectoryUrls, canonicalDirectoryUrl, canonicalDependencyDirectoryUrls); if (pinnedParent === null) return null; parentUrl = pinnedParent.url; parentDescriptorIndex = parentUrl.startsWith(directoryUrl) ? -1 : pinnedParent.ancestorIndex; } catch { return null; } }",
     "if (parentDescriptorIndex < -1) return null;",
     "const parentRootUrl = parentDescriptorIndex === -1 ? directoryUrl : dependencyDirectoryUrls[parentDescriptorIndex];",
-    "const parentDirectoryWithinRoot = relative(fileURLToPath(parentRootUrl), dirname(fileURLToPath(context.parentURL)));",
+    "const parentDirectoryWithinRoot = relative(fileURLToPath(parentRootUrl), dirname(fileURLToPath(parentUrl)));",
     "const relativePath = normalize(join(parentDirectoryWithinRoot, specifier));",
     'if (relativePath === "" || (!relativePath.startsWith("../") && relativePath !== "..")) return new URL(relativePath || ".", parentRootUrl);',
     "if (parentDescriptorIndex >= serverDependencyAncestorCount) return null;",
@@ -2082,7 +2095,7 @@ function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependenc
     "let dependencyError = error;",
     `for (let dependencyIndex = ${entryRoot ? "0" : "Math.max(0, parentDependencyAncestorIndex)"}; dependencyIndex < dependencyDirectoryUrls.length; dependencyIndex += 1) {`,
     "const dependencyDirectoryUrl = dependencyDirectoryUrls[dependencyIndex];",
-    'try { const candidateResolution = context.conditions?.includes("require") ? nextResolve(resolveBareFromDescriptor(specifier, dependencyDirectoryUrl), context) : nextResolve(specifier, { ...context, parentURL: new URL("package.json", dependencyDirectoryUrl).href }); return rememberDependencyAncestor(specifier, candidateResolution); } catch (candidateError) {',
+    'try { const resolutionDirectoryUrl = canonicalDependencyDirectoryUrls[dependencyIndex] || dependencyDirectoryUrl; const candidateResolution = context.conditions?.includes("require") ? nextResolve(resolveBareFromDescriptor(specifier, resolutionDirectoryUrl), context) : nextResolve(specifier, { ...context, parentURL: new URL("package.json", resolutionDirectoryUrl).href }); return rememberDependencyAncestor(specifier, candidateResolution); } catch (candidateError) {',
     "if (!isMissingModuleError(candidateError)) throw candidateError;",
     "dependencyError = candidateError;",
     "}",
@@ -2092,10 +2105,12 @@ function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependenc
     "});",
     "}, load(url, context, nextLoad) {",
     `if (url === target) return { format: ${JSON.stringify(format)}, source, shortCircuit: true };`,
+    "if (typeof url === \"string\" && url.startsWith(\"file:\") && !url.startsWith(directoryUrl) && !dependencyDirectoryUrls.some((dependencyDirectoryUrl) => url.startsWith(dependencyDirectoryUrl))) { try { const pinnedLoad = snapshotDescriptorResolution(pathToFileURL(fs.realpathSync(fileURLToPath(url))).href, directoryUrl, dependencyDirectoryUrls, canonicalDirectoryUrl, canonicalDependencyDirectoryUrls); if (pinnedLoad !== null) url = pinnedLoad.url; } catch {} }",
     "const dependencyDescriptorIndex = dependencyDirectoryUrls.findIndex((dependencyDirectoryUrl) => url.startsWith(dependencyDirectoryUrl));",
     "const descriptorLookup = url.startsWith(directoryUrl) || dependencyDescriptorIndex >= 0;",
-    "guardSnapshotModuleResolution(false, url, descriptorLookup);",
-    "return guardSnapshotModuleLookup(process.platform, descriptorLookup, () => {",
+    "const runtimeAllowedLoad = !descriptorLookup && isAllowedRuntimeModule(url);",
+    "guardSnapshotModuleResolution(false, url, descriptorLookup || runtimeAllowedLoad);",
+    "return guardSnapshotModuleLookup(process.platform, descriptorLookup || runtimeAllowedLoad, () => {",
     "if (!descriptorLookup) return nextLoad(url, context);",
     "const canonicalRootUrl = url.startsWith(directoryUrl) ? canonicalDirectoryUrl : canonicalDependencyDirectoryUrls[dependencyDescriptorIndex];",
     "let moduleFd;",
