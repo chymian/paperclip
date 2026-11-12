@@ -8,6 +8,7 @@ import { assertCursorWorkspacePolicy } from "./cursor-launch-policy.js";
 import { resolveQualifiedAcpxProfile, type QualifiedAcpxAgent, type QualifiedAcpxProfile } from "./qualified-profiles.js";
 import { verifyPiInstallation } from "./pi-installation.js";
 import { verifyQualifiedAcpxInstallation, type VerifiedAcpxInstallation } from "./installation-integrity.js";
+import { dshApiKeyEnv } from "./dsh-provider-config.js";
 
 /** Closed build-owned registry. Provider branches add their pinned installations here. */
 export async function verifyAcpxProfileInstallation(profile: QualifiedAcpxProfile, candidateAdmission?: AcpxCandidateStartupAdmission, options?: { signal?: AbortSignal }): Promise<VerifiedAcpxInstallation> {
@@ -43,8 +44,13 @@ export function assertAcpxProfileEnvironment(agent: QualifiedAcpxAgent, environm
   if (agent === "antigravity" && !environment.GEMINI_API_KEY?.trim() && !environment.PAPERCLIP_ACPX_ANTIGRAVITY_AUTH_JSON_SECRET?.trim()) {
     throw Object.assign(new Error("Google Antigravity requires an explicitly bound Google runtime connection. Connect a Google account or Gemini API key before starting a task."), { code: "ANTIGRAVITY_CREDENTIALS_MISSING", retryable: false });
   }
-  if (agent === "dsh" && !environment.DEEPSEEK_API_KEY?.trim()) {
-    throw Object.assign(new Error("DeepSeek Harness credentials are missing. Bind DEEPSEEK_API_KEY in the agent environment."), { code: "DSH_CREDENTIALS_MISSING", retryable: false });
+  if (agent === "dsh") {
+    // The operator may select an OpenAI-compatible provider whose key lives under
+    // PAPERCLIP_DSH_PROVIDER_API_KEY_ENV (task first, then host); default DEEPSEEK_API_KEY.
+    const keyEnv = dshApiKeyEnv(environment);
+    if (!environment[keyEnv]?.trim()) {
+      throw Object.assign(new Error(`DeepSeek Harness credentials are missing. Bind ${keyEnv} in the agent environment.`), { code: "DSH_CREDENTIALS_MISSING", retryable: false });
+    }
   }
   if (agent === "cursor" && !environment.CURSOR_API_KEY?.trim() && !environment.CURSOR_AUTH_TOKEN?.trim()) {
     throw Object.assign(new Error("Cursor credentials are missing. Bind a company secret to CURSOR_API_KEY or CURSOR_AUTH_TOKEN in the agent environment."), { code: "CURSOR_CREDENTIALS_MISSING", retryable: false });

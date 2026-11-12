@@ -7,6 +7,20 @@ describe("DSH admission", () => {
     expect(() => assertAcpxProfileEnvironment("dsh", { DEEPSEEK_API_KEY: " " })).toThrow("DEEPSEEK_API_KEY");
     expect(() => assertAcpxProfileEnvironment("dsh", { DEEPSEEK_API_KEY: "fixture" })).not.toThrow();
   });
+
+  it("checks the operator-selected provider key instead of DEEPSEEK_API_KEY", () => {
+    const task = { PAPERCLIP_DSH_PROVIDER_API_KEY_ENV: "INFERENCE_API_KEY" };
+    expect(() => assertAcpxProfileEnvironment("dsh", task)).toThrow("Bind INFERENCE_API_KEY");
+    expect(() => assertAcpxProfileEnvironment("dsh", { ...task, DEEPSEEK_API_KEY: "fixture" })).toThrow("INFERENCE_API_KEY");
+    expect(() => assertAcpxProfileEnvironment("dsh", { ...task, INFERENCE_API_KEY: "fixture" })).not.toThrow();
+    vi.stubEnv("PAPERCLIP_DSH_PROVIDER_API_KEY_ENV", "INFERENCE_API_KEY");
+    try {
+      expect(() => assertAcpxProfileEnvironment("dsh", { INFERENCE_API_KEY: "fixture" })).not.toThrow();
+      expect(() => assertAcpxProfileEnvironment("dsh", { DEEPSEEK_API_KEY: "fixture" })).toThrow("INFERENCE_API_KEY");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("Cursor actionable admission errors", () => {
