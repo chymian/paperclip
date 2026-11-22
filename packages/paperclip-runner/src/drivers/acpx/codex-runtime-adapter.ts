@@ -2,6 +2,7 @@ import { admitAcpxSessionContext } from "./session-context-admission.js";
 import { createKimiInstructionAdmission } from "./kimi-instructions.js";
 import { kimiReadOnlyPermissionAllowed } from "./kimi-config.js";
 import { createGrokPromptUsageCollector } from "./grok-usage.js";
+import { createDshPromptUsageCollector } from "./dsh-usage.js";
 import { resolveGrokDisableWebSearch } from "./grok-web-search.js";
 import { resolveGrokEffort, createGrokEffortAdmission } from "./grok-effort.js";
 import { resolveClaudeEffort, createClaudeEffortAdmission } from "./claude-effort.js";
@@ -326,7 +327,8 @@ export async function openQualifiedAcpxRuntime(
   const extensionProfile = ACPX_CAPABILITY_PROFILES[options.profile.agent];
   const extensionRequests = new Set(extensionProfile.extensionRequests);
   const extensionNotifications = new Set(extensionProfile.extensionNotifications);
-  const promptUsage = options.profile.agent === "grok" ? createGrokPromptUsageCollector() : undefined;
+  const promptUsage = options.profile.agent === "grok" ? createGrokPromptUsageCollector()
+    : options.profile.agent === "dsh" ? createDshPromptUsageCollector(options.launchEnvironment?.DSH_HOME) : undefined;
   const extensionBoundary: AcpxRuntimeExtensionBoundary = {
     active: null, sessionIds: new Set(), steering: null,
   };
@@ -1193,7 +1195,7 @@ function runtimePort(
   extensionBoundary: AcpxRuntimeExtensionBoundary,
   monitorProviderDeath: boolean,
   assertPromptPolicy?: (text: string) => void,
-  promptUsage?: ReturnType<typeof createGrokPromptUsageCollector>,
+  promptUsage?: ReturnType<typeof createGrokPromptUsageCollector> | ReturnType<typeof createDshPromptUsageCollector>,
 ): AcpxRuntimePort {
   extensionBoundary.sessionIds = new Set([identity.backendSessionId]);
   let extensionControls: Promise<void> = Promise.resolve();

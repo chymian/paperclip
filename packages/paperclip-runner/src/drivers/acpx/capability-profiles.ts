@@ -30,7 +30,7 @@ export const ACPX_CAPABILITY_PROFILES: Readonly<Record<QualifiedAcpxAgent, AcpxC
     toolRefreshOnResume: true,
     displayName: "DeepSeek Harness", qualification: "pending", models: "explicit-provider-verified",
     permissions: "interactive", questions: "not-exposed", plans: "semantic-only", tools: "authenticated-mcp",
-    recovery: "session-resume", usage: "unverified", steering: "unsupported", followUp: "controller-queue",
+    recovery: "session-resume", usage: "reported", steering: "unsupported", followUp: "controller-queue",
     artifacts: "policy_disabled", extensionRequests: [], extensionNotifications: [],
   },
   claude: {
