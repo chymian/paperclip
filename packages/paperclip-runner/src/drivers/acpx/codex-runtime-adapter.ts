@@ -328,7 +328,8 @@ export async function openQualifiedAcpxRuntime(
   const extensionRequests = new Set(extensionProfile.extensionRequests);
   const extensionNotifications = new Set(extensionProfile.extensionNotifications);
   const promptUsage = options.profile.agent === "grok" ? createGrokPromptUsageCollector()
-    : options.profile.agent === "dsh" ? createDshPromptUsageCollector(options.launchEnvironment?.DSH_HOME) : undefined;
+    // The price is agent configuration: it reaches the launch environment, not the runner's own process env.
+    : options.profile.agent === "dsh" ? createDshPromptUsageCollector(options.launchEnvironment?.DSH_HOME, { ...process.env, ...options.launchEnvironment }) : undefined;
   const extensionBoundary: AcpxRuntimeExtensionBoundary = {
     active: null, sessionIds: new Set(), steering: null,
   };
