@@ -437,7 +437,8 @@ describe.skipIf(!support.supported)("bounded workspace cohort migration", () => 
       try {
         if (interrupt && ++entered === 2) throw new Error("large_cohort_upload_interrupted");
         if (!interrupt) {
-          if (++entered === 1) timer = setTimeout(() => release(), 5000);
+          // Safety net only; on slow hosted runners 5 s released the barrier before all 8 uploads entered.
+          if (++entered === 1) timer = setTimeout(() => release(), 30_000);
           if (entered === 8) release();
           await barrier;
         }
