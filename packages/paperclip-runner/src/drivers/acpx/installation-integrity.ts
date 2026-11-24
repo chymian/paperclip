@@ -2119,7 +2119,7 @@ function snapshotBootstrap(format: AcpxCommandFormat, guarded = false, dependenc
     "const metadataBefore = fs.fstatSync(moduleFd, { bigint: true });",
     `if (!metadataBefore.isFile() || metadataBefore.size > BigInt(${MAX_AGENT_COMMAND_BYTES})) { const error = new Error("ACPX provider module is not a bounded regular file"); error.code = "ERR_ACPX_UNVERIFIED_MODULE"; throw error; }`,
     'const openedUrl = pathToFileURL(fs.realpathSync(privateSnapshot ? fileURLToPath(url) : "/proc/self/fd/" + moduleFd)).href;',
-    'if (typeof canonicalRootUrl !== "string" || !openedUrl.startsWith(canonicalRootUrl)) { const error = new Error("ACPX provider module escaped descriptor-pinned ancestry"); error.code = "ERR_ACPX_UNVERIFIED_MODULE"; throw error; }',
+    'if (typeof canonicalRootUrl !== "string" || !openedUrl.startsWith(canonicalRootUrl)) { const error = new Error("ACPX provider module escaped descriptor-pinned ancestry: " + openedUrl); error.code = "ERR_ACPX_UNVERIFIED_MODULE"; throw error; }',
     "const packageFormat = url.startsWith(directoryUrl) ? serverPackageFormat : dependencyAncestorFormats[dependencyDescriptorIndex];",
     "const hintedFormat = descriptorFormatByUrl.get(url) || context.format;",
     "const extension = extname(fileURLToPath(url));",
@@ -2167,8 +2167,9 @@ export function guardSnapshotModuleResolution(
     resolvedUrl.startsWith("file:") &&
     !descriptorAuthorized
   ) {
+    // Name the module: a refused dependency must be diagnosable from the error alone.
     const error = new Error(
-      "ACPX provider module escaped descriptor-pinned ancestry",
+      "ACPX provider module escaped descriptor-pinned ancestry: " + resolvedUrl,
     );
     Object.assign(error, { code: "ERR_ACPX_UNVERIFIED_MODULE" });
     throw error;

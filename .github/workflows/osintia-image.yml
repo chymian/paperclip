@@ -208,6 +208,13 @@ jobs:
       - name: Native-runner server suites
         if: matrix.mode == 'native'
         run: pnpm test:run:general -- --group '${{ matrix.group }}'
+      # dot-runner.test.ts builds paperclip-runnerd in beforeAll with a 300 s limit; a cold release
+      # build on a hosted runner is slower (spawnSync cargo ETIMEDOUT). Upstream restores a cached
+      # crate instead; here the daemon is built up front so the test's cargo call is incremental.
+      - name: Runner daemon release binary (dot-runner suite)
+        if: matrix.mode == 'general'
+        working-directory: packages/paperclip-runner
+        run: cargo build --release --locked --manifest-path runner/Cargo.toml -p paperclip-runner-core --bin paperclip-runnerd
       - name: General server shard
         if: matrix.mode == 'general'
         run: pnpm test:run:general -- --group '${{ matrix.group }}' --shard-index ${{ matrix.idx }} --shard-count ${{ matrix.count }}
